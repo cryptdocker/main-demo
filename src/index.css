@@ -1,0 +1,182 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+	--font-sans: "Inter", system-ui, -apple-system, sans-serif;
+	--color-dark-base: #03131a;
+	--color-dark-surface: #051e28;
+	--color-dark-card: #0a2833;
+	--color-accent: #14B8A6;
+	--color-accent-light: #5EEAD4;
+	--color-accent-cyan: #22D3EE;
+	--color-accent-gold: #FBBF24;
+	--spacing-8xl: 1440px;
+}
+
+html,
+body,
+#root {
+	width: 100%;
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	scroll-behavior: smooth;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	background-color: var(--color-dark-base);
+	color: #e2e8f0;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+}
+::-webkit-scrollbar-track {
+	background: var(--color-dark-base);
+}
+::-webkit-scrollbar-thumb {
+	background: rgba(20, 184, 166, 0.3);
+	border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(20, 184, 166, 0.5);
+}
+
+::selection {
+	background: rgba(20, 184, 166, 0.3);
+	color: #fff;
+}
+
+@keyframes float {
+	0%, 100% { transform: translateY(0px) rotate(0deg); }
+	50% { transform: translateY(-20px) rotate(2deg); }
+}
+@keyframes float-slow {
+	0%, 100% { transform: translateY(0px); }
+	50% { transform: translateY(-12px); }
+}
+@keyframes shimmer {
+	0% { background-position: -200% center; }
+	100% { background-position: 200% center; }
+}
+@keyframes glow-pulse {
+	0%, 100% { opacity: 0.4; }
+	50% { opacity: 0.8; }
+}
+@keyframes gradient-shift {
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
+.animate-shimmer {
+	background-size: 200% auto;
+	animation: shimmer 3s linear infinite;
+}
+.animate-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.animate-gradient-shift {
+	background-size: 200% 200%;
+	animation: gradient-shift 5s ease infinite;
+}
+
+.glass {
+	background: rgba(255, 255, 255, 0.03);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.glass-strong {
+	background: rgba(255, 255, 255, 0.06);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.text-gradient {
+	background: linear-gradient(135deg, #14B8A6, #22D3EE, #2DD4BF);
+	background-size: 200% auto;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+.text-gradient-gold {
+	background: linear-gradient(135deg, #FBBF24, #F59E0B, #D97706);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+.glow-teal {
+	box-shadow: 0 0 40px rgba(20, 184, 166, 0.18), 0 0 80px rgba(20, 184, 166, 0.06);
+}
+.glow-cyan {
+	box-shadow: 0 0 40px rgba(6, 182, 212, 0.15), 0 0 80px rgba(6, 182, 212, 0.05);
+}
+.glow-gold {
+	box-shadow: 0 0 40px rgba(251, 191, 36, 0.15), 0 0 80px rgba(251, 191, 36, 0.05);
+}
+
+.mesh-gradient {
+	background:
+		radial-gradient(ellipse at 20% 20%, rgba(20, 184, 166, 0.14) 0%, transparent 50%),
+		radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.09) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 50%, rgba(251, 191, 36, 0.04) 0%, transparent 50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	.animate-float,
+	.animate-float-slow,
+	.animate-shimmer,
+	.animate-glow-pulse,
+	.animate-gradient-shift {
+		animation: none !important;
+	}
+}
+
+/* Anchor targets clear the fixed navbar (h-16) */
+.section-scroll-target {
+	scroll-margin-top: 5.5rem;
+}
+
+:focus-visible {
+	outline: 2px solid rgba(45, 212, 191, 0.65);
+	outline-offset: 3px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+	outline: none;
+}
+
+.prose-dark {
+	--tw-prose-body: #94a3b8;
+	--tw-prose-headings: #f1f5f9;
+	--tw-prose-lead: #94a3b8;
+	--tw-prose-links: #5eead4;
+	--tw-prose-bold: #e2e8f0;
+	--tw-prose-counters: #64748b;
+	--tw-prose-bullets: #64748b;
+	--tw-prose-hr: rgba(255,255,255,0.08);
+	--tw-prose-quotes: #cbd5e1;
+	--tw-prose-quote-borders: rgba(20,184,166,0.3);
+	--tw-prose-captions: #64748b;
+	--tw-prose-code: #5eead4;
+	--tw-prose-pre-code: #e2e8f0;
+	--tw-prose-pre-bg: rgba(0,0,0,0.4);
+	--tw-prose-th-borders: rgba(255,255,255,0.1);
+	--tw-prose-td-borders: rgba(255,255,255,0.06);
+}
+
+*:focus {
+	outline: none;
+}
