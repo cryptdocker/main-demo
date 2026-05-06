@@ -1,4 +1,4 @@
-import { demoDelay } from "../demo/mockBackend";
+import { apiFetch } from "./api";
 
 export type Extension = {
 	uuid: string;
@@ -8,44 +8,44 @@ export type Extension = {
 	downloadUrl?: string | null;
 };
 
-const DEMO_EXTENSIONS: Extension[] = [
-	{
-		uuid: "ext-1",
-		label: "Ad blocker (demo)",
-		id: "demo-adblock",
-		category: "Privacy",
-		downloadUrl: null,
-	},
-	{
-		uuid: "ext-2",
-		label: "Password helper (demo)",
-		id: "demo-pass",
-		category: "Security",
-		downloadUrl: null,
-	},
-];
+function authHeaders(token?: string | null): HeadersInit | undefined {
+	if (!token) return undefined;
+	return { Authorization: `Bearer ${token}` };
+}
 
 export const extensionService = {
-	getAll: async (_token?: string | null) => {
-		await demoDelay();
-		return [...DEMO_EXTENSIONS];
+	getAll: (token?: string | null) =>
+		apiFetch<Extension[]>("/extension", { headers: authHeaders(token) }),
+
+	getInstalled: (params: { userUuid: string; workspaceUuid: string | null; token?: string | null }) => {
+		const qs = new URLSearchParams();
+		qs.set("userUuid", params.userUuid);
+		if (params.workspaceUuid) qs.set("workspaceUuid", params.workspaceUuid);
+		return apiFetch<Extension[]>(`/extension/installed?${qs.toString()}`, {
+			headers: authHeaders(params.token),
+		});
 	},
 
-	getInstalled: async (params: { userUuid: string; workspaceUuid: string | null; token?: string | null }) => {
-		await demoDelay();
-		void params;
-		return [] as Extension[];
-	},
+	install: (params: { userUuid: string; extensionUuid: string; workspaceUuid: string | null; token?: string | null }) =>
+		apiFetch<{ success?: boolean } | unknown>("/extension/install", {
+			method: "POST",
+			headers: authHeaders(params.token),
+			body: JSON.stringify({
+				userUuid: params.userUuid,
+				extensionUuid: params.extensionUuid,
+				workspaceUuid: params.workspaceUuid,
+			}),
+		}),
 
-	install: async (params: { userUuid: string; extensionUuid: string; workspaceUuid: string | null; token?: string | null }) => {
-		await demoDelay();
-		void params;
-		return { success: true };
-	},
-
-	uninstall: async (params: { userUuid: string; extensionUuid: string; workspaceUuid: string | null; token?: string | null }) => {
-		await demoDelay();
-		void params;
-		return { success: true as const };
-	},
+	uninstall: (params: { userUuid: string; extensionUuid: string; workspaceUuid: string | null; token?: string | null }) =>
+		apiFetch<{ success: true }>("/extension/uninstall", {
+			method: "POST",
+			headers: authHeaders(params.token),
+			body: JSON.stringify({
+				userUuid: params.userUuid,
+				extensionUuid: params.extensionUuid,
+				workspaceUuid: params.workspaceUuid,
+			}),
+		}),
 };
+

@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AuthProvider } from "./auth/AuthProvider";
 import { PATH } from "./const";
 import { PageLayout } from "./layout/PageLayout";
 import { Home } from "./page/Home";
@@ -11,6 +12,7 @@ import { Support } from "./page/Support";
 import { Privacy } from "./page/Privacy";
 import { Terms } from "./page/Terms";
 import { Download } from "./page/Download";
+import { MentalShield } from "./page/MentalShield";
 import { Documentation } from "./page/Documentation";
 import { WalletAnalysis } from "./page/WalletAnalysis";
 import { SiteAnalysis } from "./page/SiteAnalysis";
@@ -19,12 +21,26 @@ import { SignIn } from "./page/SignIn";
 import { SignUp } from "./page/SignUp";
 import { Dashboard } from "./page/Dashboard";
 import { RequireAuth } from "./component/RequireAuth";
+import { TradeGPTApp } from "./tradeGPT/TradeGPTApp";
+
+/** Standalone TradeGPT used `/chat/...`; embedded app lives under `/trade-gpt/chat/...`. */
+function LegacyTradeGPTChatRedirect() {
+	const { pathname, search } = useLocation();
+	const rest =
+		pathname.startsWith("/chat") && pathname.length > "/chat".length
+			? pathname.slice("/chat".length)
+			: "";
+	return <Navigate to={`${PATH.TRADE_GPT}/chat${rest}${search}`} replace />;
+}
 
 function App() {
 	return (
 		<BrowserRouter>
-			<Routes>
-				<Route element={<PageLayout />}>
+			<AuthProvider>
+				<Routes>
+					<Route path="/chat/*" element={<LegacyTradeGPTChatRedirect />} />
+					<Route element={<PageLayout />}>
+					<Route path={PATH.TRADE_GPT_WILDCARD} element={<TradeGPTApp />} />
 					<Route path={PATH.HOME} element={<Home />} />
 					<Route path={PATH.ABOUT} element={<About />} />
 					<Route path={PATH.BLOG} element={<Blog />} />
@@ -36,6 +52,7 @@ function App() {
 					<Route path={PATH.PRIVACY} element={<Privacy />} />
 					<Route path={PATH.TERMS} element={<Terms />} />
 					<Route path={PATH.DOWNLOAD} element={<Download />} />
+					<Route path={PATH.MENTALSHIELD} element={<MentalShield />} />
 					<Route
 						path={PATH.WALLET_ANALYSIS}
 						element={<WalletAnalysis />}
@@ -52,8 +69,9 @@ function App() {
 							</RequireAuth>
 						}
 					/>
-				</Route>
-			</Routes>
+					</Route>
+				</Routes>
+			</AuthProvider>
 		</BrowserRouter>
 	);
 }

@@ -3,66 +3,60 @@ import { useAuth } from "../../auth/useAuth";
 import { ApiError } from "../../services/api";
 import type { CreatePaymentResult } from "../../services/payment.service";
 import { paymentService } from "../../services/payment.service";
-import { siteService, type Site } from "../../services/site.service";
-import {
-	siteUserService,
-	userService,
-	type MeResponse,
-	type UserSiteUser,
-	workspaceService,
-	type UserWorkspace,
-} from "../../services/user.service";
+import { siteService } from "../../services/site.service";
+import { userService, type MeResponse } from "../../services/user.service";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { DashboardSkeleton } from "./components/DashboardSkeleton";
 import { ErrorBanner } from "./components/ErrorBanner";
+import { cx } from "./components/shared";
 import {
 	AccountSection,
-	AppsSection,
 	DevicesSection,
 	PlanBillingSection,
-	WorkspacesSection,
 } from "./components/DashboardSections";
+import { IoCashOutline, IoGlobeOutline, IoPersonOutline } from "react-icons/io5";
+
+type DashboardMainTab = "user" | "billing" | "signins";
+
+const DASHBOARD_MAIN_TABS: {
+	id: DashboardMainTab;
+	label: string;
+	icon: React.ReactNode;
+}[] = [
+	{ id: "user", label: "Account", icon: <IoPersonOutline className="text-base" /> },
+	{ id: "billing", label: "Plan & Billing", icon: <IoCashOutline className="text-base" /> },
+	{ id: "signins", label: "Sign In History", icon: <IoGlobeOutline className="text-base" /> },
+];
+
+const getMinimumTopUpAmount = (ticker: string): number => {
+	const normalized = ticker.toLowerCase();
+	if (normalized === "usdt-trc20") return 10;
+	if (normalized === "usdt-erc20" || normalized === "usdc-erc20") return 2;
+	return 1;
+};
 
 // ─── main component ───────────────────────────────────────────────────────────
 
 export const Dashboard: React.FC = () => {
 	const { user, token, signOut } = useAuth();
 	const [me, setMe] = useState<MeResponse | null>(null);
-	const [workspaces, setWorkspaces] = useState<UserWorkspace[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [catalogSiteCount, setCatalogSiteCount] = useState<number | null>(null);
+	const [catalogCategoryCount, setCatalogCategoryCount] = useState<number | null>(null);
 
 	// profile
 	const [savingProfile, setSavingProfile] = useState(false);
 	const [profileFullName, setProfileFullName] = useState("");
 	const [avatarUploading, setAvatarUploading] = useState(false);
 
-	// apps pagination
-	const [appsPage, setAppsPage] = useState(1);
-	const PAGE_SIZE = 8;
-	const [appsQuery, setAppsQuery] = useState("");
-
-	// add app
-	const [addAppOpen, setAddAppOpen] = useState(false);
-	const [siteQuery, setSiteQuery] = useState("");
-	const [siteCategoryUuid, setSiteCategoryUuid] = useState<string>("all");
-	const [sites, setSites] = useState<Site[]>([]);
-	const [sitesLoading, setSitesLoading] = useState(false);
-	const [addingSiteUuid, setAddingSiteUuid] = useState<string | null>(null);
-
-	// workspaces
-	const [workspaceCreating, setWorkspaceCreating] = useState(false);
-	const [newWorkspaceName, setNewWorkspaceName] = useState("");
-
-	// apps
-	const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({});
-
 	// billing/top-up
-	const [topUpOpen, setTopUpOpen] = useState(false);
 	const [topUpAmount, setTopUpAmount] = useState("");
 	const [topUpMethod, setTopUpMethod] = useState("usdt-erc20");
 	const [topUpBusy, setTopUpBusy] = useState(false);
 	const [topUpPayment, setTopUpPayment] = useState<CreatePaymentResult | null>(null);
+
+	const [mainTab, setMainTab] = useState<DashboardMainTab>("user");
 
 	const authed = useMemo(() => ({ token: token ?? "" }), [token]);
 
@@ -73,17 +67,19 @@ export const Dashboard: React.FC = () => {
 		setLoading(true);
 		setError(null);
 		try {
-			const meRes = await userService.getMe(token);
+			const [meRes, allSites] = await Promise.all([
+				userService.getMe(token),
+				siteService.getAll(),
+			]);
 
 			setMe(meRes);
 			setProfileFullName(meRes.fullName ?? "");
-
-			const wsList = meRes.uuid
-				? await workspaceService
-						.list(token, meRes.uuid)
-						.then((r) => (Array.isArray(r) ? r : []))
-				: [];
-			setWorkspaces(wsList);
+			setCatalogSiteCount(allSites.length);
+			setCatalogCategoryCount(
+				new Set(
+					allSites.flatMap((s) => (s.categories ?? []).map((c) => c.uuid ?? c.name)),
+				).size,
+			);
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 401) {
 				signOut();
@@ -92,6 +88,20 @@ export const Dashboard: React.FC = () => {
 			setError(e instanceof Error ? e.message : "Failed to load dashboard.");
 		} finally {
 			setLoading(false);
+		}
+	};
+
+	const refreshMeSilently = async () => {
+		if (!token) return;
+		try {
+			const meRes = await userService.getMe(token);
+			setMe(meRes);
+		} catch (e) {
+			if (e instanceof ApiError && e.status === 401) {
+				signOut();
+				return;
+			}
+			setError(e instanceof Error ? e.message : "Failed to refresh dashboard data.");
 		}
 	};
 
@@ -147,89 +157,6 @@ export const Dashboard: React.FC = () => {
 		}
 	};
 
-	const createWorkspace = async () => {
-		if (!token || !me?.uuid) return;
-		const name = newWorkspaceName.trim().slice(0, 32);
-		if (!name) return;
-		setWorkspaceCreating(true);
-		setError(null);
-		try {
-			const ws = await workspaceService.create(token, {
-				userUuid: me.uuid,
-				name,
-			});
-			setWorkspaces((p) => [...p, ws]);
-			setNewWorkspaceName("");
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Failed to create workspace.");
-		} finally {
-			setWorkspaceCreating(false);
-		}
-	};
-
-	const deleteWorkspace = async (uuid: string) => {
-		if (!token || !me?.uuid) return;
-		if (
-			!confirm("Delete this workspace? Apps assigned to it will move to Root.")
-		)
-			return;
-		setError(null);
-		try {
-			await workspaceService.delete(token, { userUuid: me.uuid, uuid });
-			setWorkspaces((p) => p.filter((w) => w.uuid !== uuid));
-			await loadAll();
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Failed to delete workspace.");
-		}
-	};
-
-	const patchSiteUser = async (
-		uuid: string,
-		body: Parameters<typeof siteUserService.update>[2],
-	) => {
-		if (!token) return;
-		setRowBusy((p) => ({ ...p, [uuid]: true }));
-		setError(null);
-		try {
-			const updated = await siteUserService.update(token, uuid, body);
-			setMe((p) => {
-				if (!p) return p;
-				return {
-					...p,
-					siteUsers: (p.siteUsers ?? []).map((su) =>
-						su.uuid === uuid ? { ...su, ...updated } : su,
-					),
-				};
-			});
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Failed to update app.");
-		} finally {
-			setRowBusy((p) => ({ ...p, [uuid]: false }));
-		}
-	};
-
-	const removeSiteUser = async (uuid: string) => {
-		if (!token) return;
-		if (!confirm("Remove this app from your account?")) return;
-		setRowBusy((p) => ({ ...p, [uuid]: true }));
-		setError(null);
-		try {
-			await siteUserService.delete(token, uuid);
-			setMe((p) =>
-				p
-					? {
-							...p,
-							siteUsers: (p.siteUsers ?? []).filter((su) => su.uuid !== uuid),
-						}
-					: p,
-			);
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Failed to remove app.");
-		} finally {
-			setRowBusy((p) => ({ ...p, [uuid]: false }));
-		}
-	};
-
 	const upgrade = async () => {
 		if (!token) return;
 		setError(null);
@@ -264,6 +191,11 @@ export const Dashboard: React.FC = () => {
 			setError("Enter a valid top up amount.");
 			return;
 		}
+		const minimumAmount = getMinimumTopUpAmount(topUpMethod);
+		if (amt < minimumAmount) {
+			setError(`Minimum top up for ${topUpMethod.toUpperCase()} is $${minimumAmount}.`);
+			return;
+		}
 		setError(null);
 		setTopUpBusy(true);
 		try {
@@ -282,17 +214,29 @@ export const Dashboard: React.FC = () => {
 
 	useEffect(() => {
 		if (!topUpPayment?.uuid) return;
+		if (String(topUpPayment.status).toLowerCase() === "confirmed") return;
 		let cancelled = false;
 		const interval = setInterval(async () => {
 			try {
 				const s = await paymentService.getPaymentStatus(topUpPayment.uuid);
 				if (cancelled) return;
+				setTopUpPayment((prev) =>
+					prev
+						? {
+								...prev,
+								status: s.status ?? prev.status,
+								addressIn: s.addressIn ?? prev.addressIn,
+								amount: s.amount ?? prev.amount,
+								ticker: s.ticker ?? prev.ticker,
+								minimumTransactionCoin:
+									s.minimumTransactionCoin ?? prev.minimumTransactionCoin,
+							}
+						: prev,
+				);
 				if (String(s.status).toLowerCase() === "confirmed") {
 					clearInterval(interval);
-					setTopUpPayment(null);
-					setTopUpOpen(false);
 					setTopUpAmount("");
-					await loadAll();
+					void refreshMeSilently();
 				}
 			} catch {
 				// ignore transient poll failures
@@ -305,107 +249,13 @@ export const Dashboard: React.FC = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [topUpPayment?.uuid]);
 
-	// ── derived ───────────────────────────────────────────────────────────────
-
-	const siteUsers = useMemo(() => {
-		return (me?.siteUsers ?? [])
-			.slice()
-			.filter((su) => su.site !== null)
-			.sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0));
-	}, [me]);
-
-	const siteUsersFiltered = useMemo(() => {
-		const q = appsQuery.trim().toLowerCase();
-		if (!q) return siteUsers;
-		return siteUsers.filter((su) => {
-			const title = (su.title ?? su.site?.title ?? "").toLowerCase();
-			const url = (su.site?.url ?? "").toLowerCase();
-			return title.includes(q) || url.includes(q);
-		});
-	}, [appsQuery, siteUsers]);
-
-	const appsTotal = siteUsersFiltered.length;
-	const appsTotalPages = Math.max(1, Math.ceil(appsTotal / PAGE_SIZE));
-	const appsPageClamped = Math.min(Math.max(1, appsPage), appsTotalPages);
-
-	useEffect(() => {
-		if (appsPage > appsTotalPages) setAppsPage(appsTotalPages);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [appsTotalPages]);
-
-	const appsSlice = useMemo(() => {
-		const start = (appsPageClamped - 1) * PAGE_SIZE;
-		return siteUsersFiltered.slice(start, start + PAGE_SIZE);
-	}, [siteUsersFiltered, appsPageClamped]);
-
-	const siteUsersByWorkspace = useMemo(() => {
-		const map: Record<string, UserSiteUser[]> = { root: [] };
-		workspaces.forEach((w) => {
-			map[w.uuid] = [];
-		});
-		(me?.siteUsers ?? []).forEach((su) => {
-			const key = su.workspaceUuid ?? "root";
-			(map[key] ??= []).push(su);
-		});
-		Object.values(map).forEach((rows) =>
-			rows.sort((a, b) => (a.sortKey ?? 0) - (b.sortKey ?? 0)),
-		);
-		return map;
-	}, [me, workspaces]);
-
-	useEffect(() => {
-		if (!addAppOpen) return;
-		setSiteCategoryUuid("all");
-		let cancelled = false;
-		setSitesLoading(true);
-		siteService
-			.getAll()
-			.then((r) => {
-				if (!cancelled) setSites(Array.isArray(r) ? r : []);
-			})
-			.catch(() => {
-				if (!cancelled) setSites([]);
-			})
-			.finally(() => {
-				if (!cancelled) setSitesLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [addAppOpen]);
-
-	const addApp = async (args: {
-		siteUuid: string;
-		workspaceUuid?: string;
-		endpoint?: string | null;
-	}) => {
-		if (!token || !me?.uuid) return;
-		setError(null);
-		setAddingSiteUuid(args.siteUuid);
-		try {
-			await siteUserService.create(token, {
-				siteUuid: args.siteUuid,
-				userUuid: me.uuid,
-				workspaceUuid: args.workspaceUuid,
-				endpoint: args.endpoint ?? "/",
-			});
-			await loadAll();
-			setAddAppOpen(false);
-			setSiteQuery("");
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Failed to add app.");
-		} finally {
-			setAddingSiteUuid(null);
-		}
-	};
-
 	if (!user) return null;
 
 	// ── render ────────────────────────────────────────────────────────────────
 
 	return (
-		<div className="max-w-5xl mx-auto px-5 py-12">
-			<DashboardHeader loading={loading} onRefresh={loadAll} />
+		<div className="max-w-8xl w-full mx-auto px-5 py-12">
+			<DashboardHeader />
 
 			<ErrorBanner error={error} onDismiss={() => setError(null)} />
 
@@ -413,93 +263,82 @@ export const Dashboard: React.FC = () => {
 				<DashboardSkeleton />
 			) : (
 				<div className="space-y-5">
-					{/* ── row 1: account + billing ── */}
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-						<AccountSection
-							me={me}
-							profileFullName={profileFullName}
-							setProfileFullName={setProfileFullName}
-							savingProfile={savingProfile}
-							onSaveProfile={saveProfile}
-							onResetProfile={() => setProfileFullName(me?.fullName ?? "")}
-							onLogout={signOut}
-							avatarUploading={avatarUploading}
-							onUploadAvatar={uploadAvatar}
-						/>
-
-						<PlanBillingSection
-							me={me}
-							plan={plan}
-							onUpgrade={upgrade}
-							onCancelPro={cancelPro}
-							topUp={{
-								open: topUpOpen,
-								onToggle: () => setTopUpOpen((p) => !p),
-								amount: topUpAmount,
-								onAmountChange: setTopUpAmount,
-								method: topUpMethod,
-								onMethodChange: setTopUpMethod,
-								busy: topUpBusy,
-								payment: topUpPayment,
-								onPay: startTopUp,
-								onReset: () => {
-									setTopUpPayment(null);
-									setTopUpAmount("");
-								},
-							}}
-						/>
+					<div
+						className="flex flex-wrap gap-1"
+						role="tablist"
+						aria-label="Dashboard sections">
+						{DASHBOARD_MAIN_TABS.map((t) => (
+							<button
+								key={t.id}
+								type="button"
+								role="tab"
+								aria-selected={mainTab === t.id}
+								id={`dashboard-tab-${t.id}`}
+								className={cx(
+									"max-w-48 flex-1 px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4",
+									mainTab === t.id
+										? "text-white shadow-sm border-b-2 border-white/10"
+										: "text-slate-500 hover:text-slate-200 border-b-2 border-transparent",
+								)}
+								onClick={() => setMainTab(t.id)}>
+								<span className="inline-flex items-center justify-center gap-2">
+									<span className="text-slate-400">{t.icon}</span>
+									<span>{t.label}</span>
+								</span>
+							</button>
+						))}
 					</div>
 
-					{/* ── apps ── */}
-					<AppsSection
-						appsTotal={appsTotal}
-						appsSlice={appsSlice}
-						workspaces={workspaces}
-						rowBusy={rowBusy}
-						onPatchSiteUser={patchSiteUser}
-						onRemoveSiteUser={removeSiteUser}
-						search={{
-							value: appsQuery,
-							onChange: setAppsQuery,
-						}}
-						addApp={{
-							open: addAppOpen,
-							onToggle: () => setAddAppOpen((p) => !p),
-							query: siteQuery,
-							onQueryChange: setSiteQuery,
-							categoryUuid: siteCategoryUuid,
-							onCategoryChange: setSiteCategoryUuid,
-							sites,
-							loading: sitesLoading,
-							addingSiteUuid,
-							onAdd: addApp,
-							workspaces,
-						}}
-						pagination={{
-							pageSize: PAGE_SIZE,
-							page: appsPageClamped,
-							totalPages: appsTotalPages,
-							onPrev: () => setAppsPage((p) => p - 1),
-							onNext: () => setAppsPage((p) => p + 1),
-							showingStart: (appsPageClamped - 1) * PAGE_SIZE + 1,
-							showingEnd: Math.min(appsPageClamped * PAGE_SIZE, appsTotal),
-						}}
-					/>
+					{mainTab === "user" && (
+						<div
+							className="space-y-5 h-[calc(100vh-310px)]"
+							role="tabpanel"
+							aria-labelledby="dashboard-tab-user">
+							<AccountSection
+								me={me}
+								profileFullName={profileFullName}
+								setProfileFullName={setProfileFullName}
+								savingProfile={savingProfile}
+								onSaveProfile={saveProfile}
+								onResetProfile={() => setProfileFullName(me?.fullName ?? "")}
+								avatarUploading={avatarUploading}
+								onUploadAvatar={uploadAvatar}
+								catalogSiteCount={catalogSiteCount}
+								catalogCategoryCount={catalogCategoryCount}
+							/>
+						</div>
+					)}
 
-					{/* ── row 3: workspaces + devices ── */}
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-						<WorkspacesSection
-							workspaces={workspaces}
-							newWorkspaceName={newWorkspaceName}
-							setNewWorkspaceName={setNewWorkspaceName}
-							workspaceCreating={workspaceCreating}
-							onCreateWorkspace={createWorkspace}
-							onDeleteWorkspace={deleteWorkspace}
-							siteUsersByWorkspace={siteUsersByWorkspace}
-						/>
+					{mainTab === "billing" && (
+						<div role="tabpanel"className="space-y-5 h-[calc(100vh-310px)]" aria-labelledby="dashboard-tab-billing">
+							<PlanBillingSection
+								me={me}
+								plan={plan}
+								onUpgrade={upgrade}
+								onCancelPro={cancelPro}
+								topUp={{
+									amount: topUpAmount,
+									onAmountChange: setTopUpAmount,
+									method: topUpMethod,
+									onMethodChange: setTopUpMethod,
+									minimumAmount: getMinimumTopUpAmount(topUpMethod),
+									busy: topUpBusy,
+									payment: topUpPayment,
+									onPay: startTopUp,
+									onReset: () => {
+										setTopUpPayment(null);
+										setTopUpAmount("");
+									},
+								}}
+							/>
+						</div>
+					)}
 
-						<DevicesSection me={me} />
-					</div>
+					{mainTab === "signins" && (
+						<div role="tabpanel"className="space-y-5 h-[calc(100vh-310px)]" aria-labelledby="dashboard-tab-signins">
+							<DevicesSection />
+						</div>
+					)}
 				</div>
 			)}
 		</div>

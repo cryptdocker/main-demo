@@ -1,4 +1,4 @@
-import { demoDelay, listCatalogSites } from "../demo/mockBackend";
+import { apiFetch } from "./api";
 
 export type Site = {
 	uuid: string;
@@ -12,8 +12,12 @@ export type Site = {
 };
 
 export const siteService = {
-	getAll: async (params?: { q?: string; type?: string }) => {
-		await demoDelay();
-		return listCatalogSites(params);
+	getAll: (params?: { q?: string; type?: string }) => {
+		const qs = new URLSearchParams();
+		if (params?.q) qs.set("q", params.q);
+		if (params?.type) qs.set("type", params.type);
+		const suffix = qs.toString();
+		return apiFetch<Site[]>(suffix ? `/site?${suffix}` : "/site");
 	},
 };
+

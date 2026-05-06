@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PATH } from "../const";
 import { AuthContext, type AuthUser, AUTH_STORAGE_KEY } from "./AuthContext";
 import {
 	getCrossDomainAuth,
@@ -28,6 +30,7 @@ function loadStoredAuth(): { user: AuthUser; token: string } | null {
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+	const navigate = useNavigate();
 	const stored = loadStoredAuth();
 	const [user, setUser] = useState<AuthUser | null>(stored?.user ?? null);
 	const [token, setToken] = useState<string | null>(stored?.token ?? null);
@@ -44,7 +47,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 		setToken(null);
 		localStorage.removeItem(AUTH_STORAGE_KEY);
 		clearCrossDomainAuth();
-	}, []);
+		navigate(PATH.HOME, { replace: true });
+	}, [navigate]);
 
 	const value = useMemo(() => ({ user, token, signIn, signOut }), [user, token, signIn, signOut]);
 

@@ -1,8 +1,6 @@
-import {
-	mockAnalyzeWallet,
-	mockAnalyzeSite,
-	mockAnalyzeNews,
-} from "../demo/mockBackend";
+import { apiFetch } from "./api";
+
+/* ---------------- Wallet Analysis (FailSafe Radar proxy) ---------------- */
 
 export interface RadarFlags {
 	sanctioned?: boolean;
@@ -49,8 +47,14 @@ export interface WalletAnalysisResponse {
 	error?: string;
 }
 
-export const analyzeWallet = (address: string): Promise<WalletAnalysisResponse> =>
-	mockAnalyzeWallet(address.trim());
+export const analyzeWallet = (
+	address: string,
+): Promise<WalletAnalysisResponse> =>
+	apiFetch<WalletAnalysisResponse>(
+		`/public/wallet-analysis/${encodeURIComponent(address.trim())}`,
+	);
+
+/* ---------------- Site Analysis (trust score) ---------------- */
 
 export interface SiteAnalysisResponse {
 	success: boolean;
@@ -63,7 +67,12 @@ export interface SiteAnalysisResponse {
 }
 
 export const analyzeSite = (url: string): Promise<SiteAnalysisResponse> =>
-	mockAnalyzeSite(url.trim());
+	apiFetch<SiteAnalysisResponse>(`/public/site-analysis`, {
+		method: "POST",
+		body: JSON.stringify({ url: url.trim() }),
+	});
+
+/* ---------------- News Analysis ---------------- */
 
 export interface NewsAnalysisItem {
 	title: string;
@@ -85,5 +94,10 @@ export interface NewsAnalysisResponse {
 	error?: string;
 }
 
-export const analyzeNews = (keywords: string[]): Promise<NewsAnalysisResponse> =>
-	mockAnalyzeNews(keywords);
+export const analyzeNews = (
+	keywords: string[],
+): Promise<NewsAnalysisResponse> =>
+	apiFetch<NewsAnalysisResponse>(`/public/news-analysis`, {
+		method: "POST",
+		body: JSON.stringify({ keywords }),
+	});

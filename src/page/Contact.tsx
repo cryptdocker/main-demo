@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useForm, ValidationError } from "@formspree/react";
 import { IoMailOutline } from "react-icons/io5";
 import { FaLinkedin, FaTelegram } from "react-icons/fa";
 import { FaMedium } from "react-icons/fa6";
@@ -7,7 +8,8 @@ import { motion } from "framer-motion";
 import { PageHeader } from "../layout/PageHeader";
 import { Button } from "../component/Button";
 import { SEO } from "../component/SEO";
-import { demoDelay } from "../demo/mockBackend";
+
+const FORMSPREE_ID = "xvzvqady";
 
 interface FormErrors {
 	name?: string;
@@ -43,6 +45,8 @@ export const Contact: React.FC = () => {
 	const prefillSubject = searchParams.get("subject") ?? "";
 	const prefillMessage = searchParams.get("message") ?? "";
 
+	const [formState, handleFormspree] = useForm(FORMSPREE_ID);
+
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [subject, setSubject] = useState(prefillSubject);
@@ -50,41 +54,41 @@ export const Contact: React.FC = () => {
 	const [errors, setErrors] = useState<FormErrors>({});
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
 	const [showConfirmation, setShowConfirmation] = useState(false);
-	const [submitting, setSubmitting] = useState(false);
+	const prevSucceeded = useRef(false);
 
-	const resetFormSoon = () => {
-		window.setTimeout(() => {
-			setShowConfirmation(false);
-			setName("");
-			setEmail("");
-			setSubject("");
-			setMessage("");
-			setErrors({});
-			setTouched({});
-		}, 5000);
-	};
+	useEffect(() => {
+		if (formState.succeeded && !prevSucceeded.current) {
+			const t = window.setTimeout(() => setShowConfirmation(true), 0);
+			const timer = setTimeout(() => {
+				setShowConfirmation(false);
+				setName("");
+				setEmail("");
+				setSubject("");
+				setMessage("");
+				setErrors({});
+				setTouched({});
+			}, 5000);
+			return () => {
+				clearTimeout(timer);
+				clearTimeout(t);
+			};
+		}
+		prevSucceeded.current = formState.succeeded;
+	}, [formState.succeeded]);
 
 	const handleBlur = (field: string) => {
 		setTouched((prev) => ({ ...prev, [field]: true }));
 		setErrors(validate({ name, email, subject, message }));
 	};
 
-	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const validationErrors = validate({ name, email, subject, message });
 		setErrors(validationErrors);
 		setTouched({ name: true, email: true, subject: true, message: true });
 
 		if (Object.keys(validationErrors).length > 0) return;
-
-		setSubmitting(true);
-		try {
-			await demoDelay(600);
-			setShowConfirmation(true);
-			resetFormSoon();
-		} finally {
-			setSubmitting(false);
-		}
+		handleFormspree(e);
 	};
 
 	const inputClass = (field: keyof FormErrors) =>
@@ -130,9 +134,6 @@ export const Contact: React.FC = () => {
 							>
 								contact@cryptdocker.com
 							</a>
-							<p className="mt-3 text-[11px] text-slate-600">
-								Demo preview: messages are not transmitted from this bundle.
-							</p>
 						</div>
 					</motion.div>
 
@@ -151,15 +152,18 @@ export const Contact: React.FC = () => {
 									<IoMailOutline className="w-7 h-7" />
 								</div>
 								<h3 className="text-xl font-semibold text-white mb-2">
-									Message queued (demo)
+									Message Sent!
 								</h3>
 								<p className="text-sm text-slate-400">
-									In production this form posts to mail or helpdesk tooling. Here it only
-									simulates a successful submit.
+									Thanks for reaching out. We'll get back to you as soon as possible.
 								</p>
 							</motion.div>
 						) : (
-							<form className="space-y-5" onSubmit={handleSubmit} aria-busy={submitting}>
+							<form
+								className="space-y-5"
+								onSubmit={handleSubmit}
+								aria-busy={formState.submitting}
+							>
 								<div className="grid sm:grid-cols-2 gap-5">
 									<div>
 										<label className="block text-sm font-medium text-slate-300 mb-1.5">
@@ -167,6 +171,7 @@ export const Contact: React.FC = () => {
 										</label>
 										<input
 											type="text"
+											name="name"
 											placeholder="Your name"
 											value={name}
 											onChange={(e) => setName(e.target.value)}
@@ -183,6 +188,7 @@ export const Contact: React.FC = () => {
 										</label>
 										<input
 											type="email"
+											name="email"
 											placeholder="you@example.com"
 											value={email}
 											onChange={(e) => setEmail(e.target.value)}
@@ -192,6 +198,12 @@ export const Contact: React.FC = () => {
 										{touched.email && errors.email && (
 											<p className="mt-1 text-xs text-red-400">{errors.email}</p>
 										)}
+										<ValidationError
+											prefix="Email"
+											field="email"
+											errors={formState.errors}
+											className="mt-1 text-xs text-red-400"
+										/>
 									</div>
 								</div>
 								<div>
@@ -200,6 +212,7 @@ export const Contact: React.FC = () => {
 									</label>
 									<input
 										type="text"
+										name="subject"
 										placeholder="What's this about?"
 										value={subject}
 										onChange={(e) => setSubject(e.target.value)}
@@ -215,6 +228,7 @@ export const Contact: React.FC = () => {
 										Message
 									</label>
 									<textarea
+										name="message"
 										rows={5}
 										placeholder="Tell us more..."
 										value={message}
@@ -226,8 +240,12 @@ export const Contact: React.FC = () => {
 										<p className="mt-1 text-xs text-red-400">{errors.message}</p>
 									)}
 								</div>
-								<Button size="lg" className="w-full" disabled={submitting}>
-									{submitting ? "Sending..." : "Send Message"}
+								<Button
+									size="lg"
+									className="w-full"
+									disabled={formState.submitting}
+								>
+									{formState.submitting ? "Sending..." : "Send Message"}
 								</Button>
 							</form>
 						)}

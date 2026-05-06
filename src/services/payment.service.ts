@@ -1,4 +1,4 @@
-import { demoDelay, mockCreatePayment, mockGetPaymentStatus } from "../demo/mockBackend";
+import { apiFetch } from "./api";
 
 export type CreatePaymentInput = {
 	userUuid: string;
@@ -25,12 +25,12 @@ export type PaymentStatusResult = {
 };
 
 export const paymentService = {
-	createPayment: async (body: CreatePaymentInput) => {
-		await demoDelay();
-		return mockCreatePayment(body);
-	},
-	getPaymentStatus: async (paymentUuid: string) => {
-		await demoDelay();
-		return mockGetPaymentStatus(paymentUuid);
-	},
+	createPayment: (body: CreatePaymentInput) =>
+		apiFetch<CreatePaymentResult>("/payment", {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+	getPaymentStatus: (paymentUuid: string) =>
+		apiFetch<PaymentStatusResult>(`/payment/${paymentUuid}/status`),
 };
+

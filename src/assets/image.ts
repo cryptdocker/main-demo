@@ -1,5 +1,8 @@
 import Logo from "./logo.png";
 import Store from "./store.svg";
+import Chrome from "./chrome.svg";
+import Firefox from "./firefox.svg";
+import Brave from "./brave.svg";
 
 export const IMG = {
     Logo,
@@ -10,4 +13,7 @@ export const IMG = {
     PSC: "https://polygonscan.com/assets/generic/html/favicon.ico",
     ASC: "https://arbiscan.io/assets/arbitrum/images/favicon.ico?v=26.2.2.0",
     Store,
+    Chrome,
+    Firefox,
+    Brave,
 };

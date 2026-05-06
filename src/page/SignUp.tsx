@@ -1,14 +1,16 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../component/Button";
 import { GoogleSSOButton } from "../component/GoogleSSOButton";
 import { PATH } from "../const";
 import { authService } from "../services";
 import { useAuth } from "../auth/useAuth";
 import { useState } from "react";
+import { resolvePostAuthRedirect } from "../utils/postAuthRedirect";
 
 export const SignUp: React.FC = () => {
 	const { signIn } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [fullName, setFullName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
@@ -26,7 +28,7 @@ export const SignUp: React.FC = () => {
 				return;
 			}
 			signIn(res);
-			navigate(PATH.HOME);
+			navigate(resolvePostAuthRedirect(location.state, PATH.HOME), { replace: true });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to create account.");
 		} finally {
@@ -35,12 +37,16 @@ export const SignUp: React.FC = () => {
 	};
 
 	return (
-		<div className="max-w-xl mx-auto px-6 py-20">
+		<div className="max-w-xl w-full mx-auto px-6 py-20">
 			<div className="glass-strong rounded-2xl p-8">
 				<h1 className="text-2xl font-bold text-white">Create account</h1>
 				<p className="text-slate-400 mt-2">
 					Already have an account?{" "}
-					<Link className="text-teal-300 hover:text-teal-200 underline" to={PATH.SIGN_IN}>
+					<Link
+						className="text-teal-300 hover:text-teal-200 underline"
+						to={PATH.SIGN_IN}
+						state={location.state}
+					>
 						Sign in
 					</Link>
 				</p>
@@ -119,7 +125,7 @@ export const SignUp: React.FC = () => {
 								setLoading(true);
 								const res = await authService.loginWithGoogleCode({ code });
 								signIn(res);
-								navigate(PATH.HOME);
+								navigate(resolvePostAuthRedirect(location.state, PATH.HOME), { replace: true });
 							}}
 						/>
 					</div>

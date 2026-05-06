@@ -12,7 +12,7 @@ import { Button } from "../component/Button";
 import { PATH } from "../const";
 import { detectOS } from "../utils/detectOS";
 
-const MotionLink = motion(Link);
+const MotionLink = motion.create(Link);
 
 const HERO_ROTATING_LABELS = [
 	"Built-in AI tools & Chrome extensions",

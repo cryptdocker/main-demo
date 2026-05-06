@@ -1,14 +1,16 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../component/Button";
 import { GoogleSSOButton } from "../component/GoogleSSOButton";
 import { PATH } from "../const";
 import { authService } from "../services";
 import { useAuth } from "../auth/useAuth";
 import { useState } from "react";
+import { resolvePostAuthRedirect } from "../utils/postAuthRedirect";
 
 export const SignIn: React.FC = () => {
 	const { signIn } = useAuth();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export const SignIn: React.FC = () => {
 		try {
 			const res = await authService.loginWithEmail({ email, password });
 			signIn(res);
-			navigate(PATH.HOME);
+			navigate(resolvePostAuthRedirect(location.state, PATH.HOME), { replace: true });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to sign in.");
 		} finally {
@@ -30,12 +32,16 @@ export const SignIn: React.FC = () => {
 	};
 
 	return (
-		<div className="max-w-xl mx-auto px-6 py-20">
+		<div className="max-w-xl w-full mx-auto px-6 py-20">
 			<div className="glass-strong rounded-2xl p-8">
 				<h1 className="text-2xl font-bold text-white">Sign in</h1>
 				<p className="text-slate-400 mt-2">
 					New here?{" "}
-					<Link className="text-teal-300 hover:text-teal-200 underline" to={PATH.SIGN_UP}>
+					<Link
+						className="text-teal-300 hover:text-teal-200 underline"
+						to={PATH.SIGN_UP}
+						state={location.state}
+					>
 						Create an account
 					</Link>
 				</p>
@@ -99,7 +105,7 @@ export const SignIn: React.FC = () => {
 								setLoading(true);
 								const res = await authService.loginWithGoogleCode({ code });
 								signIn(res);
-								navigate(PATH.HOME);
+								navigate(resolvePostAuthRedirect(location.state, PATH.HOME), { replace: true });
 							}}
 						/>
 					</div>

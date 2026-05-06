@@ -11,6 +11,21 @@
 	--color-accent-cyan: #22D3EE;
 	--color-accent-gold: #FBBF24;
 	--spacing-8xl: 1440px;
+
+	/* TradeGPT theme-aware color utilities (use CSS vars with rgb() for alpha) */
+	--color-th-bg: rgb(var(--color-bg));
+	--color-th-sidebar: rgb(var(--color-sidebar));
+	--color-th-surface: rgb(var(--color-surface));
+	--color-th-input: rgb(var(--color-input));
+	--color-th-input-hover: rgb(var(--color-input-hover));
+	--color-th-code: rgb(var(--color-code));
+	--color-th-border: rgb(var(--color-border));
+	--color-th-border-muted: rgb(var(--color-border-muted));
+	--color-th-text: rgb(var(--color-text));
+	--color-th-text-muted: rgb(var(--color-text-muted));
+	--color-th-accent: rgb(var(--color-tgpt-accent));
+	--color-th-accent-soft: rgb(var(--color-tgpt-accent-soft));
+	--color-th-accent-glow: rgb(var(--color-tgpt-accent-glow));
 }
 
 html,
@@ -179,4 +194,21 @@ a:focus:not(:focus-visible) {
 
 *:focus {
 	outline: none;
+}
+
+/* ── TradeGPT theme variables ────────────────────────────── */
+:root {
+	--color-bg: 6 22 24;
+	--color-sidebar: 8 28 31;
+	--color-surface: 13 38 42;
+	--color-input: 15 46 51;
+	--color-input-hover: 21 58 63;
+	--color-code: 10 32 36;
+	--color-border: 26 74 78;
+	--color-border-muted: 42 102 106;
+	--color-text: 225 245 241;
+	--color-text-muted: 144 186 180;
+	--color-tgpt-accent: 45 212 191;
+	--color-tgpt-accent-soft: 20 184 166;
+	--color-tgpt-accent-glow: 153 246 228;
 }

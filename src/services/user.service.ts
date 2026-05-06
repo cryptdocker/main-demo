@@ -1,19 +1,4 @@
-import {
-	assertDemoToken,
-	demoDelay,
-	mockCreateWorkspace,
-	mockDeleteWorkspace,
-	mockSiteUserCreate,
-	mockUploadAvatar,
-	setDemoAvatar,
-	snapshotMe,
-	snapshotWorkspaces,
-	updateProfileFullName,
-	patchWorkspaceMeSiteUser,
-	removeSiteUser,
-	upgradeDemoToPro,
-	cancelProDemo,
-} from "../demo/mockBackend";
+import { apiFetch } from "./api";
 
 export type UserSite = {
 	uuid: string;
@@ -57,6 +42,22 @@ export type UserDevice = {
 	};
 };
 
+export type SignInHistory = {
+	uuid: string;
+	type: "App" | "Web";
+	createdAt: string;
+	ipAddress?: string | null;
+	country?: string | null;
+	location?: string | null;
+};
+
+export type PaginatedSignInHistory = {
+	items: SignInHistory[];
+	total: number;
+	page: number;
+	limit: number;
+};
+
 export type MeResponse = {
 	uuid: string;
 	email: string;
@@ -75,110 +76,105 @@ export type MeResponse = {
 	proCancelAtPeriodEnd?: boolean;
 	siteUsers?: UserSiteUser[];
 	userDevices?: UserDevice[];
+	signInHistory?: SignInHistory[];
 };
 
+function authHeaders(token: string): HeadersInit {
+	return { Authorization: `Bearer ${token}` };
+}
+
 export const userService = {
-	getMe: async (token: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		return snapshotMe();
-	},
-	updateMe: async (
+	getMe: (token: string) => apiFetch<MeResponse>("/user", { headers: authHeaders(token) }),
+	getSignInHistory: (
 		token: string,
-		body: Partial<MeResponse> & { uuid: string },
+		params: { type: "App" | "Web"; page?: number; limit?: number },
 	) => {
-		await demoDelay();
-		assertDemoToken(token);
-		if (body.fullName !== undefined) updateProfileFullName(body.fullName);
-		return { message: "Saved (demo)." };
+		const qs = new URLSearchParams({
+			type: params.type,
+			page: String(params.page ?? 1),
+			limit: String(params.limit ?? 10),
+		});
+		return apiFetch<PaginatedSignInHistory>(`/user/signin-history?${qs.toString()}`, {
+			headers: authHeaders(token),
+		});
 	},
+	updateMe: (token: string, body: Partial<MeResponse> & { uuid: string }) =>
+		apiFetch<{ message?: string }>("/user", {
+			method: "PUT",
+			headers: { ...authHeaders(token) },
+			body: JSON.stringify(body),
+		}),
 	uploadAvatar: async (token: string, body: { uuid: string; file: File }) => {
-		assertDemoToken(token);
-		void body.uuid;
-		const url = await mockUploadAvatar(body.file);
-		setDemoAvatar(url);
-		return { message: "OK (demo).", avatar: url };
+		const fd = new FormData();
+		fd.append("uuid", body.uuid);
+		fd.append("avatar", body.file);
+		return apiFetch<{ message?: string; avatar?: string }>("/user/avatar", {
+			method: "POST",
+			headers: authHeaders(token),
+			body: fd,
+		});
 	},
-	getFavorites: async (token: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		return { siteIds: [] as string[] };
-	},
-	syncFavorites: async (token: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		return {};
-	},
-	upgradeToPro: async (token: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		upgradeDemoToPro();
-		return { message: "Upgraded (demo).", user: snapshotMe() };
-	},
-	cancelProAtPeriodEnd: async (token: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		cancelProDemo();
-		return { message: "Cancellation scheduled (demo).", user: snapshotMe() };
-	},
+	getFavorites: (token: string) =>
+		apiFetch<{ siteIds: string[] }>("/user/favorites", { headers: authHeaders(token) }),
+	syncFavorites: (token: string) =>
+		apiFetch<unknown>("/user/favorites/sync", { method: "POST", headers: authHeaders(token) }),
+	upgradeToPro: (token: string) =>
+		apiFetch<{ message?: string; user?: MeResponse }>("/user/upgrade-pro", {
+			method: "POST",
+			headers: authHeaders(token),
+		}),
+	cancelProAtPeriodEnd: (token: string) =>
+		apiFetch<{ message?: string; user?: MeResponse }>("/user/cancel-pro", {
+			method: "POST",
+			headers: authHeaders(token),
+		}),
 };
 
 export const workspaceService = {
-	list: async (token: string, userUuid: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		void userUuid;
-		return snapshotWorkspaces();
-	},
-	create: async (token: string, body: { userUuid: string; name: string }) => {
-		assertDemoToken(token);
-		return mockCreateWorkspace(body.name, body.userUuid);
-	},
-	delete: async (
-		token: string,
-		params: { userUuid: string; uuid: string; deleteSites?: boolean },
-	) => {
-		assertDemoToken(token);
-		void params.userUuid;
-		void params.deleteSites;
-		await mockDeleteWorkspace(params.uuid);
-		return { success: true };
+	list: (token: string, userUuid: string) =>
+		apiFetch<UserWorkspace[]>(`/workspace?userUuid=${encodeURIComponent(userUuid)}`, {
+			headers: authHeaders(token),
+		}),
+	create: (token: string, body: { userUuid: string; name: string }) =>
+		apiFetch<UserWorkspace>("/workspace", {
+			method: "POST",
+			headers: { ...authHeaders(token) },
+			body: JSON.stringify(body),
+		}),
+	delete: (token: string, params: { userUuid: string; uuid: string; deleteSites?: boolean }) => {
+		const qs = new URLSearchParams({ userUuid: params.userUuid });
+		if (params.deleteSites) qs.set("deleteSites", "true");
+		return apiFetch<{ success: boolean }>(`/workspace/${params.uuid}?${qs.toString()}`, {
+			method: "DELETE",
+			headers: authHeaders(token),
+		});
 	},
 };
 
 export const siteUserService = {
-	create: async (
+	create: (
 		token: string,
 		body: { siteUuid: string; userUuid: string; workspaceUuid?: string; endpoint?: string | null },
-	) => {
-		assertDemoToken(token);
-		return mockSiteUserCreate(body);
-	},
-	update: async (
+	) =>
+		apiFetch<UserSiteUser>("/site-user", {
+			method: "POST",
+			headers: { ...authHeaders(token) },
+			body: JSON.stringify(body),
+		}),
+	update: (
 		token: string,
 		uuid: string,
-		body: Partial<
-			Pick<
-				UserSiteUser,
-				| "workspaceUuid"
-				| "sortKey"
-				| "title"
-				| "icon"
-				| "notificationEnabled"
-				| "soundEnabled"
-				| "hibernation"
-				| "endpoint"
-			>
-		>,
-	) => {
-		await demoDelay();
-		assertDemoToken(token);
-		return patchWorkspaceMeSiteUser(uuid, body);
-	},
-	delete: async (token: string, uuid: string) => {
-		await demoDelay();
-		assertDemoToken(token);
-		removeSiteUser(uuid);
-		return { success: true };
-	},
+		body: Partial<Pick<UserSiteUser, "workspaceUuid" | "sortKey" | "title" | "icon" | "notificationEnabled" | "soundEnabled" | "hibernation" | "endpoint">>,
+	) =>
+		apiFetch<UserSiteUser>(`/site-user/${uuid}`, {
+			method: "PATCH",
+			headers: { ...authHeaders(token) },
+			body: JSON.stringify(body),
+		}),
+	delete: (token: string, uuid: string) =>
+		apiFetch<{ success?: boolean }>(`/site-user/${uuid}`, {
+			method: "DELETE",
+			headers: authHeaders(token),
+		}),
 };
+

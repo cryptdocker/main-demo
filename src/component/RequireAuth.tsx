@@ -10,7 +10,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 		return (
 			<Navigate
 				to={PATH.SIGN_IN}
-				state={{ from: location.pathname, backgroundLocation: location }}
+				state={{
+					from: `${location.pathname}${location.search}`,
+					backgroundLocation: location,
+				}}
 			/>
 		);
 	}
