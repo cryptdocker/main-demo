@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { RiRobot2Line } from "react-icons/ri";
+import { PATH } from "../const";
 
 export const TradeGPTBadge: React.FC = () => {
 	const [position, setPosition] = useState("-left-41");
+	const navigate = useNavigate();
 
 	useEffect(() => {
 		setTimeout(() => {
@@ -13,13 +16,7 @@ export const TradeGPTBadge: React.FC = () => {
 	return (
 		<button
 			type="button"
-			onClick={() =>
-				window.open(
-					"https://demo.cryptdocker.com/trade-gpt",
-					"_blank",
-					"noopener,noreferrer",
-				)
-			}
+			onClick={() => navigate(PATH.TRADE_GPT)}
 			className={`fixed ${position} top-[calc(50vh-31px)] z-50 transition-all duration-300`}
 			aria-label="Open TradeGPT">
 			<span className="group relative inline-flex items-center gap-3 rounded-2xl border border-teal-400/30 bg-dark-surface/85 backdrop-blur-xl p-3 shadow-xl shadow-teal-500/20">

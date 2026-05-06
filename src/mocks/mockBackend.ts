@@ -147,7 +147,7 @@ const store = {
 		site?: { uuid: string; title: string | null; url?: string | null; image?: string | null } | null;
 		workspace?: { uuid: string; name: string } | null;
 	}>,
-	signInHistory: Array.from({ length: 14 }).map((_, i) => ({
+	signInHistory: Array.from({ length: 40 }).map((_, i) => ({
 		uuid: `hist-${i + 1}`,
 		type: i % 2 === 0 ? ("Web" as const) : ("App" as const),
 		createdAt: new Date(Date.now() - i * 1000 * 60 * 60 * 12).toISOString(),
@@ -397,6 +397,68 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 			su.workspaceUuid === uuid ? { ...su, workspaceUuid: null, workspace: null } : su,
 		);
 		return json(true, 200, { success: true });
+	}
+
+	if (path === "/site" && method === "GET") {
+		const sites = [
+			{
+				uuid: "site-1",
+				type: "native",
+				title: "Binance",
+				url: "https://www.binance.com",
+				image: null,
+				description: "Crypto exchange (demo catalog entry).",
+				endpoint: null,
+				categories: [
+					{ uuid: "cat-exchange", name: "Exchange" },
+					{ uuid: "cat-trading", name: "Trading" },
+				],
+			},
+			{
+				uuid: "site-2",
+				type: "native",
+				title: "CoinMarketCap",
+				url: "https://coinmarketcap.com",
+				image: null,
+				description: "Market data (demo catalog entry).",
+				endpoint: null,
+				categories: [
+					{ uuid: "cat-market-data", name: "Market data" },
+					{ uuid: "cat-research", name: "Research" },
+				],
+			},
+			{
+				uuid: "site-3",
+				type: "custom",
+				title: "My Custom Site",
+				url: "https://example.com",
+				image: null,
+				description: "Custom site (demo catalog entry).",
+				endpoint: null,
+				categories: [{ uuid: "cat-custom", name: "Custom" }],
+			},
+		] as Array<{
+			uuid: string;
+			type?: string;
+			title: string | null;
+			url?: string | null;
+			image?: string | null;
+			description?: string | null;
+			endpoint?: string | null;
+			categories?: Array<{ uuid: string; name: string }>;
+		}>;
+
+		const q = String(query.get("q") ?? "").trim().toLowerCase();
+		const type = String(query.get("type") ?? "").trim().toLowerCase();
+
+		const filtered = sites.filter((s) => {
+			if (type && String(s.type ?? "").toLowerCase() !== type) return false;
+			if (!q) return true;
+			const hay = `${s.title ?? ""} ${s.url ?? ""} ${s.description ?? ""}`.toLowerCase();
+			return hay.includes(q);
+		});
+
+		return json(true, 200, filtered);
 	}
 
 	if (path === "/site-user" && method === "POST") {

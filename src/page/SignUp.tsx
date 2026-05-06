@@ -11,9 +11,9 @@ export const SignUp: React.FC = () => {
 	const { signIn } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const [fullName, setFullName] = useState("");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+	const [fullName, setFullName] = useState("Demo User");
+	const [email, setEmail] = useState("demo@cryptdocker.com");
+	const [password, setPassword] = useState("123wersd");
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 

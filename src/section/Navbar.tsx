@@ -49,6 +49,7 @@ export const Navbar: React.FC = () => {
 	const [mobileAnalyticsOpen, setMobileAnalyticsOpen] = useState(false);
 	const location = useLocation();
 	const isTradeGPTPage = location.pathname.startsWith(PATH.TRADE_GPT);
+	const logoTo = user ? PATH.DASHBOARD : PATH.HOME;
 	const resourcesRef = useRef<HTMLDivElement | null>(null);
 	const productsRef = useRef<HTMLDivElement | null>(null);
 	const analyticsRef = useRef<HTMLDivElement | null>(null);
@@ -166,10 +167,10 @@ export const Navbar: React.FC = () => {
 		>
 			<div className={`${isTradeGPTPage ? "max-w-full" : "max-w-8xl"} mx-auto px-6 h-16 flex items-center justify-between transition-all`}>
 				<Link
-					to={PATH.HOME}
+					to={logoTo}
 					className="flex items-center gap-2.5 group"
 					onClick={() => {
-						if (location.pathname === PATH.HOME) {
+						if (location.pathname === logoTo) {
 							window.scrollTo({ top: 0, behavior: "smooth" });
 						}
 					}}
