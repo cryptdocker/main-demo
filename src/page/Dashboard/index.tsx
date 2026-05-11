@@ -29,7 +29,7 @@ const DASHBOARD_MAIN_TABS: {
 	label: string;
 	icon: React.ReactNode;
 }[] = [
-	{ id: "user", label: "Credential", icon: <IoPersonOutline className="text-base" /> },
+	{ id: "user", label: "Profile", icon: <IoPersonOutline className="text-base" /> },
 	{ id: "billing", label: "Plan & Billing", icon: <IoCashOutline className="text-base" /> },
 	{ id: "subscription", label: "Subscription", icon: <IoPricetagOutline className="text-base" /> },
 	{ id: "signins", label: "Sign In History", icon: <IoGlobeOutline className="text-base" /> },
@@ -45,7 +45,7 @@ const getMinimumTopUpAmount = (ticker: string): number => {
 // ─── main component ───────────────────────────────────────────────────────────
 
 export const Dashboard: React.FC = () => {
-	const { user, token, signOut } = useAuth();
+	const { user, token, signOut, updateUser } = useAuth();
 	const [me, setMe] = useState<MeResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -80,6 +80,7 @@ export const Dashboard: React.FC = () => {
 			]);
 
 			setMe(meRes);
+			updateUser({ fullName: meRes.fullName, avatar: meRes.avatar });
 			setProfileFullName(meRes.fullName ?? "");
 			setCatalogSiteCount(allSites.length);
 			setCatalogCategoryCount(
@@ -103,6 +104,7 @@ export const Dashboard: React.FC = () => {
 		try {
 			const meRes = await userService.getMe(token);
 			setMe(meRes);
+			updateUser({ fullName: meRes.fullName, avatar: meRes.avatar });
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 401) {
 				signOut();
@@ -139,7 +141,9 @@ export const Dashboard: React.FC = () => {
 				uuid: me.uuid,
 				fullName: profileFullName.trim() || undefined,
 			});
-			setMe(await userService.getMe(token));
+			const meRes = await userService.getMe(token);
+			setMe(meRes);
+			updateUser({ fullName: meRes.fullName, avatar: meRes.avatar });
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Failed to update profile.");
 		} finally {
@@ -156,7 +160,9 @@ export const Dashboard: React.FC = () => {
 				uuid: me.uuid,
 				file,
 			});
-			setMe((p) => (p ? { ...p, avatar: res.avatar ?? p.avatar } : p));
+			const nextAvatar = res.avatar ?? me.avatar;
+			setMe((p) => (p ? { ...p, avatar: nextAvatar } : p));
+			if (nextAvatar) updateUser({ avatar: nextAvatar });
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Failed to upload photo.");
 		} finally {
@@ -169,8 +175,10 @@ export const Dashboard: React.FC = () => {
 		setError(null);
 		try {
 			const res = await userService.upgradeToPro(token);
-			if (res.user) setMe(res.user);
-			else await loadAll();
+			if (res.user) {
+				setMe(res.user);
+				updateUser({ fullName: res.user.fullName, avatar: res.user.avatar });
+			} else await loadAll();
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Upgrade failed.");
 		}
@@ -181,8 +189,10 @@ export const Dashboard: React.FC = () => {
 		setError(null);
 		try {
 			const res = await userService.cancelProAtPeriodEnd(token);
-			if (res.user) setMe(res.user);
-			else await loadAll();
+			if (res.user) {
+				setMe(res.user);
+				updateUser({ fullName: res.user.fullName, avatar: res.user.avatar });
+			} else await loadAll();
 		} catch (e) {
 			setError(
 				e instanceof Error ? e.message : "Could not schedule cancellation.",

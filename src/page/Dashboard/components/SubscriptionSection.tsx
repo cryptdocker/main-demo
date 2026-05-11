@@ -9,7 +9,45 @@ import {
 } from "../../../tradeGPT/lib/api";
 import { apiFetch } from "../../../services/api";
 import { Badge, Section } from "./ui";
+import { cx } from "./shared";
 import { IoPricetagOutline, IoWalletOutline } from "react-icons/io5";
+
+function CellSkeleton({ className }: { className?: string }) {
+	return (
+		<span
+			className={cx(
+				"inline-block align-middle rounded-md bg-white/8 animate-pulse motion-reduce:animate-none",
+				className,
+			)}
+			aria-hidden
+		/>
+	);
+}
+
+/** Skeleton cells for Current Plan → Action (use after Product Name column). */
+function ProductRowDataSkeletonCells() {
+	return (
+		<>
+			<td className="px-4 py-3 align-middle">
+				<CellSkeleton className="h-6 w-21 rounded-full" />
+			</td>
+			<td className="px-4 py-3 align-middle">
+				<CellSkeleton className="h-4 w-40 max-w-full" />
+			</td>
+			<td className="px-4 py-3 align-middle">
+				<CellSkeleton className="h-4 w-32 max-w-full" />
+			</td>
+			<td className="px-4 py-3 align-middle">
+				<CellSkeleton className="h-4 w-14" />
+			</td>
+			<td className="px-4 py-3 align-middle text-right">
+				<div className="flex min-h-9 items-center justify-end">
+					<CellSkeleton className="h-9 w-35 rounded-xl" />
+				</div>
+			</td>
+		</>
+	);
+}
 
 function fmtDate(value: string | null | undefined) {
 	if (!value) return "—";
@@ -118,71 +156,59 @@ export function SubscriptionSection({
 	onRefreshMe: () => void;
 }) {
 	const [tradeGpt, setTradeGpt] = useState<SubscriptionInfo | null>(null);
-	const [tradeGptLoading, setTradeGptLoading] = useState(false);
 	const [tradeGptBusy, setTradeGptBusy] = useState(false);
 	const [tradeGptError, setTradeGptError] = useState<string | null>(null);
 	const [prices, setPrices] = useState<ProductPrices>({});
 	const [projectSubs, setProjectSubs] = useState<ProjectSubscriptionStatus[]>([]);
+	/** True until TradeGPT subscription, project subscriptions, and prices have all settled (then rows render together). */
+	const [productsDataLoading, setProductsDataLoading] = useState(true);
 	const [mentalBusy, setMentalBusy] = useState(false);
 	const [mentalError, setMentalError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
-		setTradeGptLoading(true);
+		setProductsDataLoading(true);
 		setTradeGptError(null);
-		apiGetSubscription(token)
-			.then((s) => {
-				if (cancelled) return;
-				setTradeGpt(s);
-			})
-			.catch((e) => {
-				if (cancelled) return;
+
+		void (async () => {
+			const [tradeRes, projectRes, priceRes] = await Promise.allSettled([
+				apiGetSubscription(token),
+				apiGetProjectSubscriptions(token),
+				apiGetProductPrices(),
+			]);
+			if (cancelled) return;
+
+			if (tradeRes.status === "fulfilled") {
+				setTradeGpt(tradeRes.value);
+			} else {
+				setTradeGpt(null);
+				const e = tradeRes.reason;
 				setTradeGptError(
 					e instanceof Error
 						? e.message
 						: "Failed to load TradeGPT subscription.",
 				);
-			})
-			.finally(() => {
-				if (cancelled) return;
-				setTradeGptLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [token]);
+			}
 
-	useEffect(() => {
-		let cancelled = false;
-		apiGetProjectSubscriptions(token)
-			.then((subs) => {
-				if (cancelled) return;
-				setProjectSubs(subs);
-			})
-			.catch(() => {
-				if (cancelled) return;
+			if (projectRes.status === "fulfilled") {
+				setProjectSubs(projectRes.value);
+			} else {
 				setProjectSubs([]);
-			});
+			}
+
+			if (priceRes.status === "fulfilled") {
+				setPrices(priceRes.value);
+			} else {
+				setPrices({});
+			}
+
+			setProductsDataLoading(false);
+		})();
+
 		return () => {
 			cancelled = true;
 		};
 	}, [token]);
-
-	useEffect(() => {
-		let cancelled = false;
-		apiGetProductPrices()
-			.then((p) => {
-				if (cancelled) return;
-				setPrices(p);
-			})
-			.catch(() => {
-				if (cancelled) return;
-				setPrices({});
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
 
 	const cryptdockerPlan: "Free" | "Trial" | "Pro" = plan.isPro
 		? "Pro"
@@ -226,7 +252,6 @@ export function SubscriptionSection({
 		<Section
 			title="Subscription"
 			icon={<IoPricetagOutline className="text-lg" />}
-			subtitle="Balance, top ups, and per-product subscription status."
 		>
 			<div className="space-y-4">
 				<div className="flex items-center justify-between gap-3 rounded-xl py-2">
@@ -251,257 +276,293 @@ export function SubscriptionSection({
 						<p className="text-sm font-semibold text-white">Products</p>
 					</div>
 					<div className="overflow-auto">
-						<table className="w-full text-left text-sm">
+						<table
+							className="w-full min-w-[640px] table-fixed text-left text-sm"
+							aria-busy={productsDataLoading}>
+							<colgroup>
+								<col className="w-[17%]" />
+								<col className="w-[12%]" />
+								<col className="w-[22%]" />
+								<col className="w-[17%]" />
+								<col className="w-[10%]" />
+								<col className="w-[22%]" />
+							</colgroup>
 							<thead className="text-xs uppercase tracking-wide text-slate-500 bg-black/10">
 								<tr>
-									<th className="px-4 py-2.5 font-semibold">Product Name</th>
-									<th className="px-4 py-2.5 font-semibold">Current Plan</th>
-									<th className="px-4 py-2.5 font-semibold">Trial Expires</th>
-									<th className="px-4 py-2.5 font-semibold">Next Billing</th>
-									<th className="px-4 py-2.5 font-semibold">Price</th>
-									<th className="px-4 py-2.5 font-semibold text-right">
+									<th className="px-4 py-2.5 font-semibold align-middle">Product Name</th>
+									<th className="px-4 py-2.5 font-semibold align-middle">Current Plan</th>
+									<th className="px-4 py-2.5 font-semibold align-middle">Trial Expires</th>
+									<th className="px-4 py-2.5 font-semibold align-middle">Next Billing</th>
+									<th className="px-4 py-2.5 font-semibold align-middle">Price</th>
+									<th className="px-4 py-2.5 font-semibold align-middle text-right">
 										Action
 									</th>
 								</tr>
 							</thead>
 							<tbody className="divide-y divide-white/8">
 								<tr className="text-slate-200">
-									<td className="px-4 py-3 font-semibold">CryptDocker</td>
-									<td className="px-4 py-3">
-										<Badge
-											variant={
-												cryptdockerPlan === "Pro"
-													? "good"
-													: cryptdockerPlan === "Trial"
-														? "good"
-														: "neutral"
-											}>
-											{cryptdockerPlan}
-										</Badge>
+									<td className="px-4 py-3 align-middle font-semibold text-slate-200">
+										CryptDocker
 									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{cryptdockerPlan === "Trial"
-											? `${fmtDate(me?.trialExpiresAt)}${typeof cryptdockerTrialDays === "number" ? ` (${cryptdockerTrialDays}d)` : ""}`
-											: "—"}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{cryptdockerPlan === "Trial"
-											? "—"
-											: fmtDate(me?.billingDate)}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{fmtMoney(cryptdockerProPriceUsd)}
-									</td>
-									<td className="px-4 py-3 text-right">
-										{cryptdockerPlan === "Pro" ? (
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={cryptdockerCancelScheduled}
-												onClick={() => {
-													if (cryptdockerCancelScheduled) return;
-													void onDowngradeCryptDocker();
-												}}>
-												{cryptdockerCancelScheduled
-													? "Cancellation Scheduled"
-													: "Downgrade Plan"}
-											</Button>
-										) : (
-											<Button size="sm" onClick={onUpgradeCryptDocker}>
-												Upgrade Plan
-											</Button>
-										)}
-									</td>
-								</tr>
-
-								<tr className="text-slate-200">
-									<td className="px-4 py-3 font-semibold">TradeGPT</td>
-									<td className="px-4 py-3">
-										{tradeGptLoading ? (
-											<span className="text-slate-500">Loading…</span>
-										) : tradeGptError ? (
-											<span className="text-red-200">Error</span>
-										) : (
-											<Badge
-												variant={
-													tradegptPlan === "Pro"
-														? "good"
-														: tradegptPlan === "Trial"
+									{productsDataLoading ? (
+										<ProductRowDataSkeletonCells />
+									) : (
+										<>
+											<td className="px-4 py-3 align-middle">
+												<Badge
+													variant={
+														cryptdockerPlan === "Pro"
 															? "good"
-															: "neutral"
-												}>
-												{tradegptPlan}
-											</Badge>
-										)}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{tradeGptLoading || tradeGptError
-											? "—"
-											: tradeGpt?.trialActive
-												? `${fmtDate(tradeGpt.trialEndsAt)} (${tradeGpt.trialDaysLeft}d)`
-												: "—"}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{tradeGptLoading || tradeGptError
-											? "—"
-											: tradeGpt?.trialActive
-												? "—"
-												: fmtDate(tradeGpt?.nextBillingDate)}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{tradeGptLoading || tradeGptError
-											? "—"
-											: fmtMoney(tradegptProPriceUsd)}
-									</td>
-									<td className="px-4 py-3 text-right">
-										{tradeGptLoading ? null : tradeGptError ? (
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => setTradeGptError(null)}>
-												Dismiss
-											</Button>
-										) : tradeGpt?.plan === "pro" ? (
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={
-													tradeGptBusy ||
-													!tradeGpt ||
-													Boolean(
-														(tradeGpt as any).proCancelAtPeriodEnd ??
-															(tradeGpt as any).ProCancelAtPeriodEnd,
-													)
-												}
-												onClick={async () => {
-													if (!tradeGpt || tradeGpt.plan !== "pro") return;
-													setTradeGptBusy(true);
-													setTradeGptError(null);
-													try {
-														const res = await apiDowngradeSubscription(token);
-														setTradeGpt(res.subscription);
-														onRefreshMe();
-													} catch (e) {
-														setTradeGptError(
-															e instanceof Error ? e.message : "Downgrade failed.",
-														);
-													} finally {
-														setTradeGptBusy(false);
-													}
-												}}>
-												{(tradeGpt as any).proCancelAtPeriodEnd ??
-												(tradeGpt as any).ProCancelAtPeriodEnd
-													? "Cancellation Scheduled"
-													: "Downgrade Plan"}
-											</Button>
-										) : (
-											<Button
-												size="sm"
-												disabled={tradeGptBusy || !tradeGpt}
-												onClick={async () => {
-													if (!tradeGpt || tradeGpt.plan === "pro") return;
-													setTradeGptBusy(true);
-													setTradeGptError(null);
-													try {
-														const res = await apiUpgradeSubscription(token);
-														setTradeGpt(res.subscription);
-														onRefreshMe();
-													} catch (e) {
-														setTradeGptError(
-															e instanceof Error
-																? e.message
-																: "Upgrade failed.",
-														);
-													} finally {
-														setTradeGptBusy(false);
-													}
-												}}>
-												Upgrade Plan
-											</Button>
-										)}
-									</td>
+															: cryptdockerPlan === "Trial"
+																? "good"
+																: "neutral"
+													}>
+													{cryptdockerPlan}
+												</Badge>
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{cryptdockerPlan === "Trial"
+													? `${fmtDate(me?.trialExpiresAt)}${typeof cryptdockerTrialDays === "number" ? ` (${cryptdockerTrialDays}d)` : ""}`
+													: "—"}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{cryptdockerPlan === "Trial"
+													? "—"
+													: fmtDate(me?.billingDate)}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{fmtMoney(cryptdockerProPriceUsd)}
+											</td>
+											<td className="px-4 py-3 align-middle text-right">
+												<div className="flex min-h-9 items-center justify-end gap-2">
+													{cryptdockerPlan === "Pro" ? (
+														<Button
+															size="sm"
+															variant="outline"
+															disabled={cryptdockerCancelScheduled}
+															onClick={() => {
+																if (cryptdockerCancelScheduled) return;
+																void onDowngradeCryptDocker();
+															}}>
+															{cryptdockerCancelScheduled
+																? "Cancellation Scheduled"
+																: "Downgrade Plan"}
+														</Button>
+													) : (
+														<Button size="sm" onClick={onUpgradeCryptDocker}>
+															Upgrade Plan
+														</Button>
+													)}
+												</div>
+											</td>
+										</>
+									)}
 								</tr>
 
 								<tr className="text-slate-200">
-									<td className="px-4 py-3 font-semibold">MentalShield</td>
-									<td className="px-4 py-3">
-										<Badge
-											variant={
-												mentalShieldPlan === "Pro"
-													? "good"
-													: mentalShieldPlan === "Trial"
-														? "good"
-														: "neutral"
-											}>
-											{mentalShieldPlan}
-										</Badge>
+									<td className="px-4 py-3 align-middle font-semibold text-slate-200">
+										TradeGPT
 									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{mentalShieldSub?.trialActive
-											? `${fmtDate(mentalShieldSub.trialExpiresAt)} (${mentalShieldSub.trialDaysLeft}d)`
-											: "—"}
+									{productsDataLoading ? (
+										<ProductRowDataSkeletonCells />
+									) : (
+										<>
+											<td className="px-4 py-3 align-middle">
+												{tradeGptError ? (
+													<span className="text-sm text-red-200">Error</span>
+												) : (
+													<Badge
+														variant={
+															tradegptPlan === "Pro"
+																? "good"
+																: tradegptPlan === "Trial"
+																	? "good"
+																	: "neutral"
+														}>
+														{tradegptPlan}
+													</Badge>
+												)}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{tradeGptError
+													? "—"
+													: tradeGpt?.trialActive
+														? `${fmtDate(tradeGpt.trialEndsAt)} (${tradeGpt.trialDaysLeft}d)`
+														: "—"}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{tradeGptError
+													? "—"
+													: tradeGpt?.trialActive
+														? "—"
+														: fmtDate(tradeGpt?.nextBillingDate)}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{tradeGptError ? "—" : fmtMoney(tradegptProPriceUsd)}
+											</td>
+											<td className="px-4 py-3 align-middle text-right">
+												<div className="flex min-h-9 items-center justify-end gap-2">
+													{tradeGptError ? (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() => setTradeGptError(null)}>
+															Dismiss
+														</Button>
+													) : tradeGpt?.plan === "pro" ? (
+														<Button
+															size="sm"
+															variant="outline"
+															disabled={
+																tradeGptBusy ||
+																!tradeGpt ||
+																Boolean(
+																	(tradeGpt as any).proCancelAtPeriodEnd ??
+																		(tradeGpt as any).ProCancelAtPeriodEnd,
+																)
+															}
+															onClick={async () => {
+																if (!tradeGpt || tradeGpt.plan !== "pro") return;
+																setTradeGptBusy(true);
+																setTradeGptError(null);
+																try {
+																	const res = await apiDowngradeSubscription(token);
+																	setTradeGpt(res.subscription);
+																	onRefreshMe();
+																} catch (e) {
+																	setTradeGptError(
+																		e instanceof Error ? e.message : "Downgrade failed.",
+																	);
+																} finally {
+																	setTradeGptBusy(false);
+																}
+															}}>
+															{(tradeGpt as any).proCancelAtPeriodEnd ??
+															(tradeGpt as any).ProCancelAtPeriodEnd
+																? "Cancellation Scheduled"
+																: "Downgrade Plan"}
+														</Button>
+													) : (
+														<Button
+															size="sm"
+															disabled={tradeGptBusy || !tradeGpt}
+															onClick={async () => {
+																if (!tradeGpt || tradeGpt.plan === "pro") return;
+																setTradeGptBusy(true);
+																setTradeGptError(null);
+																try {
+																	const res = await apiUpgradeSubscription(token);
+																	setTradeGpt(res.subscription);
+																	onRefreshMe();
+																} catch (e) {
+																	setTradeGptError(
+																		e instanceof Error
+																			? e.message
+																			: "Upgrade failed.",
+																	);
+																} finally {
+																	setTradeGptBusy(false);
+																}
+															}}>
+															Upgrade Plan
+														</Button>
+													)}
+												</div>
+											</td>
+										</>
+									)}
+								</tr>
+
+								<tr className="text-slate-200">
+									<td className="px-4 py-3 align-middle font-semibold text-slate-200">
+										MentalShield
 									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{mentalShieldSub?.trialActive
-											? "—"
-											: fmtDate(mentalShieldSub?.nextBillingDate)}
-									</td>
-									<td className="px-4 py-3 text-slate-300">
-										{fmtMoney(mentalshieldProPriceUsd)}
-									</td>
-									<td className="px-4 py-3 text-right">
-										{mentalError ? (
-											<Button size="sm" variant="outline" onClick={() => setMentalError(null)}>
-												Dismiss
-											</Button>
-										) : mentalShieldSub?.paymentMethod === "pro" ? (
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={mentalBusy || mentalCancelScheduled}
-												onClick={async () => {
-													if (!token) return;
-													if (!mentalShieldSub || mentalShieldSub.paymentMethod !== "pro") return;
-													if (mentalCancelScheduled) return;
-													setMentalBusy(true);
-													setMentalError(null);
-													try {
-														await apiCancelProjectSubscription(token, "mentalshield");
-														const subs = await apiGetProjectSubscriptions(token);
-														setProjectSubs(subs);
-														onRefreshMe();
-													} catch (e) {
-														setMentalError(e instanceof Error ? e.message : "Downgrade failed.");
-													} finally {
-														setMentalBusy(false);
-													}
-												}}>
-												{mentalCancelScheduled ? "Cancellation Scheduled" : "Downgrade Plan"}
-											</Button>
-										) : (
-											<Button
-												size="sm"
-												disabled={mentalBusy || !mentalShieldSub}
-												onClick={async () => {
-													if (!token) return;
-													if (!mentalShieldSub || mentalShieldSub.paymentMethod === "pro") return;
-													setMentalBusy(true);
-													setMentalError(null);
-													try {
-														await apiUpgradeProjectSubscription(token, "mentalshield");
-														const subs = await apiGetProjectSubscriptions(token);
-														setProjectSubs(subs);
-														onRefreshMe();
-													} catch (e) {
-														setMentalError(e instanceof Error ? e.message : "Upgrade failed.");
-													} finally {
-														setMentalBusy(false);
-													}
-												}}>
-												Upgrade Plan
-											</Button>
-										)}
-									</td>
+									{productsDataLoading ? (
+										<ProductRowDataSkeletonCells />
+									) : (
+										<>
+											<td className="px-4 py-3 align-middle">
+												<Badge
+													variant={
+														mentalShieldPlan === "Pro"
+															? "good"
+															: mentalShieldPlan === "Trial"
+																? "good"
+																: "neutral"
+													}>
+													{mentalShieldPlan}
+												</Badge>
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{mentalShieldSub?.trialActive
+													? `${fmtDate(mentalShieldSub.trialExpiresAt)} (${mentalShieldSub.trialDaysLeft}d)`
+													: "—"}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{mentalShieldSub?.trialActive
+													? "—"
+													: fmtDate(mentalShieldSub?.nextBillingDate)}
+											</td>
+											<td className="px-4 py-3 align-middle text-slate-300">
+												{fmtMoney(mentalshieldProPriceUsd)}
+											</td>
+											<td className="px-4 py-3 align-middle text-right">
+												<div className="flex min-h-9 items-center justify-end gap-2">
+													{mentalError ? (
+														<Button size="sm" variant="outline" onClick={() => setMentalError(null)}>
+															Dismiss
+														</Button>
+													) : mentalShieldSub?.paymentMethod === "pro" ? (
+														<Button
+															size="sm"
+															variant="outline"
+															disabled={mentalBusy || mentalCancelScheduled}
+															onClick={async () => {
+																if (!token) return;
+																if (!mentalShieldSub || mentalShieldSub.paymentMethod !== "pro") return;
+																if (mentalCancelScheduled) return;
+																setMentalBusy(true);
+																setMentalError(null);
+																try {
+																	await apiCancelProjectSubscription(token, "mentalshield");
+																	const subs = await apiGetProjectSubscriptions(token);
+																	setProjectSubs(subs);
+																	onRefreshMe();
+																} catch (e) {
+																	setMentalError(e instanceof Error ? e.message : "Downgrade failed.");
+																} finally {
+																	setMentalBusy(false);
+																}
+															}}>
+															{mentalCancelScheduled ? "Cancellation Scheduled" : "Downgrade Plan"}
+														</Button>
+													) : (
+														<Button
+															size="sm"
+															disabled={mentalBusy || !mentalShieldSub}
+															onClick={async () => {
+																if (!token) return;
+																if (!mentalShieldSub || mentalShieldSub.paymentMethod === "pro") return;
+																setMentalBusy(true);
+																setMentalError(null);
+																try {
+																	await apiUpgradeProjectSubscription(token, "mentalshield");
+																	const subs = await apiGetProjectSubscriptions(token);
+																	setProjectSubs(subs);
+																	onRefreshMe();
+																} catch (e) {
+																	setMentalError(e instanceof Error ? e.message : "Upgrade failed.");
+																} finally {
+																	setMentalBusy(false);
+																}
+															}}>
+															Upgrade Plan
+														</Button>
+													)}
+												</div>
+											</td>
+										</>
+									)}
 								</tr>
 							</tbody>
 						</table>

@@ -7,6 +7,7 @@ import {
 	IoGlobeOutline,
 	IoGridOutline,
 	IoKeyOutline,
+	IoLogInOutline,
 	IoMailOutline,
 	IoPersonOutline,
 	IoPricetagOutline,
@@ -14,11 +15,12 @@ import {
 	IoSaveOutline,
 } from "react-icons/io5";
 import { cx, INPUT } from "./shared";
-import { Badge, Section, Stat } from "./ui";
+import { Section, Stat } from "./ui";
 import { Modal } from "./Modal";
 import { useAuth } from "../../../auth/useAuth";
 import { authService } from "../../../services";
-
+import { IMG } from "../../../assets/image";
+import { DEMO_CHANGE_PASSWORD_CURRENT } from "../../../const/env";
 export function AccountSection({
 	me,
 	profileFullName,
@@ -43,7 +45,20 @@ export function AccountSection({
 	catalogCategoryCount: number | null;
 }) {
 	const { token } = useAuth();
-	const isEmailUser = String(me?.authProvider ?? "").toLowerCase() === "email";
+	const providerNorm = String(me?.authProvider ?? "").toLowerCase();
+	const isGoogleUser =
+		providerNorm === "google" || providerNorm === "google-idp" || providerNorm.includes("google");
+	/** Backend may use `email` or `password` for email/password accounts. */
+	const isEmailUser =
+		providerNorm === "email" || providerNorm === "password";
+	const signInMethodLabel =
+		isGoogleUser
+			? "Google"
+			: isEmailUser
+				? "Email / Password"
+				: me?.authProvider
+					? `${me.authProvider.charAt(0).toUpperCase()}${me.authProvider.slice(1).toLowerCase()}`
+					: "—";
 
 	const [pwOpen, setPwOpen] = useState(false);
 	const [pwBusy, setPwBusy] = useState(false);
@@ -61,10 +76,12 @@ export function AccountSection({
 	}, []);
 
 	const openPw = useCallback(() => {
+		if (!isEmailUser) return;
 		setPwSuccess(null);
 		resetPwForm();
+		setCurrentPassword(DEMO_CHANGE_PASSWORD_CURRENT);
 		setPwOpen(true);
-	}, [resetPwForm]);
+	}, [resetPwForm, isEmailUser]);
 
 	const closePw = useCallback(() => {
 		if (pwBusy) return;
@@ -98,7 +115,14 @@ export function AccountSection({
 		} finally {
 			setPwBusy(false);
 		}
-	}, [token, canSubmitPw, currentPassword, newPassword, confirmPassword, resetPwForm]);
+	}, [
+		token,
+		canSubmitPw,
+		currentPassword,
+		newPassword,
+		confirmPassword,
+		resetPwForm,
+	]);
 
 	const stats = useMemo(() => {
 		const siteUsers = me?.siteUsers ?? [];
@@ -114,25 +138,8 @@ export function AccountSection({
 	}, [me?.siteUsers]);
 
 	return (
-		<Section
-			title="Credential"
-			icon={<IoPersonOutline className="text-lg" />}
-			badge={
-				<div className="flex items-center gap-1.5">
-					{me?.authProvider?.toLowerCase() === "email" &&
-						(me?.emailVerified ? (
-							<Badge variant="good">Verified</Badge>
-						) : (
-							<Badge variant="warn">Unverified</Badge>
-						))}
-					<Badge>
-						{me?.authProvider?.toLowerCase() === "google"
-							? "Google"
-							: (me?.authProvider ?? "—").toUpperCase()}
-					</Badge>
-				</div>
-			}>
-			<div className="flex flex-col items-center justify-start gap-6 w-full h-full">
+		<Section title="Profile" icon={<IoPersonOutline className="text-lg" />}>
+			<div className="w-full max-w-3xl mx-auto flex flex-col gap-8 justify-center items-center h-full">
 				{pwSuccess && (
 					<div className="w-full max-w-5xl rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
 						{pwSuccess}
@@ -163,8 +170,8 @@ export function AccountSection({
 					</div>
 				</div>
 
-				<div className="w-full h-full max-w-5xl mx-auto flex flex-col md:flex-row items-center md:items-start md:justify-between gap-6">
-					<div className="shrink-0 flex flex-col items-center gap-3">
+				<div className="w-full flex flex-col sm:flex-row sm:items-start gap-6 sm:gap-8">
+					<div className="shrink-0 flex flex-col items-center sm:items-start gap-3 mx-auto sm:mx-0">
 						<label className="group relative block">
 							<input
 								type="file"
@@ -216,7 +223,7 @@ export function AccountSection({
 						</label>
 					</div>
 
-					<div className="w-full h-full flex flex-col justify-between gap-3">
+					<div className="min-w-0 flex-1 flex flex-col justify-between gap-4">
 						<div className="w-full flex flex-col gap-3">
 							<div className="space-y-1">
 								<label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
@@ -229,7 +236,6 @@ export function AccountSection({
 									className={cx(INPUT, "text-slate-500 cursor-not-allowed")}
 								/>
 							</div>
-
 							<div className="space-y-1">
 								<label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
 									<IoPersonOutline className="text-sm" />
@@ -242,23 +248,47 @@ export function AccountSection({
 									placeholder="Your name"
 								/>
 							</div>
-
-							{isEmailUser && (
-								<div className="space-y-1">
-									<label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-										<IoKeyOutline className="text-sm" />
-										Password
-									</label>
-									<div className="flex items-center gap-2">
-										<Button size="sm" variant="outline" onClick={openPw}>
-											Change Password
-										</Button>
-									</div>
+							<div className="space-y-1">
+								<label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+									<IoLogInOutline className="text-sm" />
+									Sign-in method
+								</label>
+								<div
+									className={cx(
+										INPUT,
+										"flex flex-wrap items-center gap-2 text-slate-200 cursor-default",
+									)}>
+									{signInMethodLabel === "Google" ? (
+										<img src={IMG.Chrome} alt="Google" className="w-4 h-4" />
+									) : (
+										<IoMailOutline />
+									)}
+									<span className="font-medium">{signInMethodLabel}</span>
 								</div>
-							)}
+							</div>
+							<div
+								className={cx(
+									"space-y-1 transition-opacity duration-300",
+									isEmailUser ? "opacity-100" : "opacity-0 pointer-events-none",
+								)}
+								aria-hidden={!isEmailUser}>
+								<label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+									<IoKeyOutline className="text-sm" />
+									Password
+								</label>
+								<div className="flex items-center gap-2">
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={openPw}
+										disabled={!isEmailUser}>
+										Change Password
+									</Button>
+								</div>
+							</div>
 						</div>
 
-						<div className="flex items-center justify-end gap-2 pt-1">
+						<div className="flex items-center justify-end gap-2 pt-16">
 							<Button
 								size="sm"
 								variant="outline"
@@ -286,7 +316,9 @@ export function AccountSection({
 			<Modal open={pwOpen} title="Change password" onClose={closePw}>
 				<div className="space-y-3">
 					<div className="space-y-1.5">
-						<label className="text-sm text-slate-300" htmlFor="dashboard-current-password">
+						<label
+							className="text-sm text-slate-300"
+							htmlFor="dashboard-current-password">
 							Current password
 						</label>
 						<input
@@ -300,7 +332,9 @@ export function AccountSection({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<label className="text-sm text-slate-300" htmlFor="dashboard-new-password">
+						<label
+							className="text-sm text-slate-300"
+							htmlFor="dashboard-new-password">
 							New password
 						</label>
 						<input
@@ -314,7 +348,9 @@ export function AccountSection({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<label className="text-sm text-slate-300" htmlFor="dashboard-confirm-password">
+						<label
+							className="text-sm text-slate-300"
+							htmlFor="dashboard-confirm-password">
 							Confirm new password
 						</label>
 						<input
@@ -341,7 +377,9 @@ export function AccountSection({
 						<Button variant="outline" onClick={closePw} disabled={pwBusy}>
 							Cancel
 						</Button>
-						<Button onClick={() => void submitPw()} disabled={pwBusy || !canSubmitPw}>
+						<Button
+							onClick={() => void submitPw()}
+							disabled={pwBusy || !canSubmitPw}>
 							{pwBusy ? "Saving…" : "Update password"}
 						</Button>
 					</div>

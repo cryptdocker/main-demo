@@ -148,7 +148,7 @@ function HistoryTable({
 						transition={{ duration: 0.22, ease: "easeInOut" }}
 						className="overflow-hidden"
 					>
-						<div className="h-[360px] min-h-0 flex flex-col">{body}</div>
+						<div className="h-[440px] min-h-0 flex flex-col">{body}</div>
 					</motion.div>
 				)}
 			</AnimatePresence>

@@ -193,16 +193,21 @@ export function ChatSidebar({
 				<div className="flex items-center justify-between gap-2">
 					{planInfo && (
 						<div
-							className="flex min-w-0 items-center justify-end gap-2 rounded-xl bg-th-surface/40"
+							className="flex min-w-0 items-center justify-end gap-4 rounded-xl"
 							title={planInfo.title ?? undefined}
 							aria-label="Plan details">
 							<span className="shrink-0 rounded-full border border-th-border/70 bg-th-input/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-th-text/80">
 								{planInfo.planLabel.toUpperCase()}
 							</span>
 							{planInfo.dateValue && (
-								<span className="truncate text-xs text-th-text-muted">
+								<div className="flex flex-col">
+								<span className="truncate text-[10px] text-th-text-muted capitalize">
+									{planInfo.planLabel.toUpperCase() === "PRO" ? "Next billing Date" : "Expires Date"}
+								</span>
+								<span className="truncate text-[10px] text-th-text-muted">
 									{planInfo.dateValue}
 								</span>
+								</div>
 							)}
 						</div>
 					)}
@@ -288,7 +293,7 @@ export function ChatSidebar({
 											className="w-full px-1"
 											title={planInfo.title ?? undefined}
 											aria-label="Plan details">
-											<div className="w-full rounded-lg border border-th-border/60 bg-th-surface/40 py-1 text-center text-[10px] font-semibold tracking-wide text-th-text/80">
+											<div className="w-full rounded-lg py-1 text-center text-[10px] font-semibold tracking-wide text-th-text/80">
 												{planInfo.planLabel.toUpperCase()}
 											</div>
 										</div>

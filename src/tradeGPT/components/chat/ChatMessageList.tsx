@@ -1,12 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type RefObject } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { FiCopy, FiEdit2, FiCheck, FiAlertTriangle } from "react-icons/fi";
+import { FiCopy, FiEdit2, FiCheck } from "react-icons/fi";
 import type { TradeModeId, TradeModeMeta } from "../../lib/chatApi";
 import type { Components } from "react-markdown";
 import { pickStarterSuggestions } from "../../lib/suggestedQuestions";
 import { isMongoObjectId } from "../../lib/mongoId";
-import { COPY_FEEDBACK_RESET_MS, FOLLOWUP_STALE_MS } from "../../config/constants";
+import { COPY_FEEDBACK_RESET_MS } from "../../config/constants";
 
 const MARKDOWN_PLUGINS = [remarkGfm];
 
@@ -22,15 +22,15 @@ const MARKDOWN_COMPONENTS: Components = {
 
 const PROSE_CLS = [
   "prose prose-sm max-w-none leading-relaxed dark:prose-invert",
-  "prose-headings:text-th-text",
-  "prose-p:my-2",
-  "prose-a:text-teal-600 prose-a:no-underline hover:prose-a:underline dark:prose-a:text-teal-400",
-  "prose-strong:text-th-text",
-  "prose-code:rounded prose-code:bg-th-code prose-code:px-1.5 prose-code:py-0.5 prose-code:text-teal-700 prose-code:before:content-none prose-code:after:content-none dark:prose-code:text-teal-300",
-  "prose-pre:rounded-lg prose-pre:bg-th-code prose-pre:p-4",
-  "prose-ol:my-2 prose-ul:my-2 prose-li:my-0.5",
-  "prose-table:text-sm prose-th:border prose-th:border-th-border prose-th:bg-th-surface prose-th:px-3 prose-th:py-1.5 prose-td:border prose-td:border-th-border prose-td:px-3 prose-td:py-1.5",
-  "prose-blockquote:border-teal-500 prose-blockquote:text-th-text-muted",
+  "prose-headings:text-white",
+  "prose-p:my-2 prose-p:text-white",
+  "prose-a:text-teal-400 prose-a:no-underline hover:prose-a:underline",
+  "prose-strong:text-white",
+  "prose-code:rounded prose-code:bg-th-code prose-code:px-1.5 prose-code:py-0.5 prose-code:text-teal-200 prose-code:before:content-none prose-code:after:content-none",
+  "prose-pre:rounded-lg prose-pre:bg-th-code prose-pre:p-4 prose-pre:text-slate-100",
+  "prose-ol:my-2 prose-ul:my-2 prose-li:my-0.5 prose-li:text-white",
+  "prose-table:text-sm prose-th:border prose-th:border-th-border prose-th:bg-th-surface prose-th:px-3 prose-th:py-1.5 prose-th:text-white prose-td:border prose-td:border-th-border prose-td:px-3 prose-td:py-1.5 prose-td:text-white",
+  "prose-blockquote:border-teal-500 prose-blockquote:text-slate-200",
   "prose-hr:border-th-border",
 ].join(" ");
 
@@ -46,6 +46,10 @@ export type UiMessage = {
 type Props = {
   messages: UiMessage[];
   streamingContent: string;
+  /** True while the assistant request is in flight (including before first streamed token). */
+  sending: boolean;
+  /** Placed inside the scroll area so `scrollIntoView` moves the chat transcript scrollbar. */
+  scrollAnchorRef?: RefObject<HTMLDivElement | null>;
   mode: TradeModeId;
   /** Labels for mode marks on user bubbles and chips. */
   modeOptions: TradeModeMeta[];
@@ -131,27 +135,20 @@ function modeMarkMeta(modeId: TradeModeId, options: TradeModeMeta[]) {
   return options.find((x) => x.id === modeId);
 }
 
-function isFollowUpStale(isoDate?: string): boolean {
-  if (!isoDate) return false;
-  const ms = Date.parse(isoDate);
-  if (Number.isNaN(ms)) return false;
-  return Date.now() - ms >= FOLLOWUP_STALE_MS;
-}
-
 export function ChatMessageList({
   messages,
   streamingContent,
+  sending,
+  scrollAnchorRef,
   mode,
   modeOptions,
   conversationId,
   onPickSuggestion,
   onCopy,
   onEditUserMessage,
-  showFollowUpSuggestions,
-  followUpByMessageId,
-  followUpStatusByMessageId,
 }: Props) {
-  const showEmpty = messages.length === 0 && !streamingContent;
+  const awaitingFirstToken = sending && !streamingContent;
+  const showEmpty = messages.length === 0 && !streamingContent && !awaitingFirstToken;
   const starters = pickStarterSuggestions(mode, conversationId);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -166,9 +163,6 @@ export function ChatMessageList({
     },
     [onCopy]
   );
-
-  const lastIsAssistant =
-    messages.length > 0 && messages[messages.length - 1].role === "assistant";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -192,7 +186,7 @@ export function ChatMessageList({
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
         <ul className="space-y-6">
-          {messages.map((m, i) => (
+          {messages.map((m) => (
             <li key={m.id} className="group">
               {m.role === "user" ? (
                 <div className="flex justify-end">
@@ -229,7 +223,7 @@ export function ChatMessageList({
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-teal-500 to-emerald-600 text-[10px] font-bold text-white shadow-sm sm:h-8 sm:w-8 sm:text-xs">
                     AI
                   </div>
-                  <div className="min-w-0 flex-1 text-th-text">
+                  <div className="min-w-0 flex-1 text-white">
                     <div className={PROSE_CLS}>
                       <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={MARKDOWN_COMPONENTS}>
                         {m.content}
@@ -240,56 +234,31 @@ export function ChatMessageList({
                       copied={copiedKey === m.id}
                       onCopy={() => handleCopy(m.id, m.content)}
                     />
-                    {showFollowUpSuggestions &&
-                      lastIsAssistant &&
-                      i === messages.length - 1 &&
-                      !streamingContent && (
-                        <div className="pt-4">
-                          {followUpByMessageId[m.id]?.length ? (
-                            <>
-                              <p className="mb-2 text-xs font-medium text-th-text-muted">
-                                Suggested next questions
-                              </p>
-                              <SuggestionChips
-                                items={followUpByMessageId[m.id]!}
-                                keySeed={`follow-${m.id}-${mode}`}
-                                onPick={onPickSuggestion}
-                              />
-                            </>
-                          ) : followUpStatusByMessageId[m.id]?.status === "withdrawn" ? (
-                            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                              <FiAlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                              <span>
-                                {followUpStatusByMessageId[m.id]?.notice ??
-                                  "Suggested questions were automatically withdrawn."}
-                              </span>
-                            </div>
-                          ) : isFollowUpStale(m.createdAt) ? (
-                            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                              <FiAlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                              <span>
-                                Suggested questions were automatically withdrawn after 1 minute because generation did not complete.
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-xs text-th-text-muted">
-                              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-th-border-muted border-t-teal-500" />
-                              Generating suggestions…
-                            </div>
-                          )}
-                        </div>
-                      )}
                   </div>
                 </div>
               )}
             </li>
           ))}
+          {awaitingFirstToken && (
+            <li className="group flex gap-2 sm:gap-4" aria-live="polite" role="status">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-teal-500 to-emerald-600 text-[10px] font-bold text-white shadow-sm sm:h-8 sm:w-8 sm:text-xs">
+                AI
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-3 py-1 text-th-text">
+                <span
+                  className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-th-border-muted border-t-teal-500 motion-reduce:animate-none"
+                  aria-hidden
+                />
+                <span className="text-sm text-th-text-muted">Thinking…</span>
+              </div>
+            </li>
+          )}
           {streamingContent && (
             <li className="group flex gap-2 sm:gap-4">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-teal-500 to-emerald-600 text-[10px] font-bold text-white shadow-sm sm:h-8 sm:w-8 sm:text-xs">
                 AI
               </div>
-              <div className="min-w-0 flex-1 text-th-text">
+              <div className="min-w-0 flex-1 text-white">
                 <div className={PROSE_CLS}>
                   <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={MARKDOWN_COMPONENTS}>
                     {streamingContent}
@@ -319,6 +288,7 @@ export function ChatMessageList({
           )}
         </ul>
       </div>
+      <div ref={scrollAnchorRef} className="h-px shrink-0" aria-hidden />
     </div>
   );
 }

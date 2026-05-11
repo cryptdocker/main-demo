@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PATH } from "../const";
-import { AuthContext, type AuthUser, AUTH_STORAGE_KEY } from "./AuthContext";
+import { AuthContext, type AuthUser, type AuthUserPatch, AUTH_STORAGE_KEY } from "./AuthContext";
 import {
 	getCrossDomainAuth,
 	setCrossDomainAuth,
@@ -50,7 +50,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 		navigate(PATH.HOME, { replace: true });
 	}, [navigate]);
 
-	const value = useMemo(() => ({ user, token, signIn, signOut }), [user, token, signIn, signOut]);
+	const updateUser = useCallback(
+		(patch: AuthUserPatch) => {
+			setUser((prev) => {
+				if (!prev || !token) return prev;
+				const next = { ...prev, ...patch };
+				const payload = { user: next, token };
+				localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
+				setCrossDomainAuth(payload);
+				return next;
+			});
+		},
+		[token],
+	);
+
+	const value = useMemo(
+		() => ({ user, token, signIn, signOut, updateUser }),
+		[user, token, signIn, signOut, updateUser],
+	);
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

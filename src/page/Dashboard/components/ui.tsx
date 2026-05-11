@@ -56,9 +56,6 @@ export function Stat({
 }
 
 export function Section({
-	title,
-	icon,
-	subtitle,
 	children,
 	badge,
 }: {
@@ -70,16 +67,7 @@ export function Section({
 }) {
 	return (
 		<section className="glass-strong rounded-2xl border border-white/8 h-full p-6 flex flex-col">
-			<div className="flex items-start justify-between gap-4 mb-5">
-				<div className="min-w-0">
-					<h2 className="text-base font-semibold text-white inline-flex items-center gap-2">
-						{icon && <span className="text-slate-400">{icon}</span>}
-						<span>{title}</span>
-					</h2>
-					{subtitle && (
-						<p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
-					)}
-				</div>
+			<div className="absolute top-2 right-2">
 				{badge && <div className="shrink-0">{badge}</div>}
 			</div>
 			<div className="flex-1 min-h-0">{children}</div>
@@ -195,7 +183,10 @@ export function Select({
 				onClick={() => !disabled && setOpen((p) => !p)}
 				onKeyDown={(e) => {
 					if (disabled) return;
-					if (e.key === "Escape") { setOpen(false); return; }
+					if (e.key === "Escape") {
+						setOpen(false);
+						return;
+					}
 					if (e.key === "Enter" || e.key === " ") {
 						e.preventDefault();
 						setOpen(true);
@@ -204,13 +195,17 @@ export function Select({
 					if (e.key === "ArrowDown") {
 						e.preventDefault();
 						setOpen(true);
-						setActiveIndex((p) => Math.min(options.length - 1, p < 0 ? 0 : p + 1));
+						setActiveIndex((p) =>
+							Math.min(options.length - 1, p < 0 ? 0 : p + 1),
+						);
 						return;
 					}
 					if (e.key === "ArrowUp") {
 						e.preventDefault();
 						setOpen(true);
-						setActiveIndex((p) => Math.max(0, p < 0 ? options.length - 1 : p - 1));
+						setActiveIndex((p) =>
+							Math.max(0, p < 0 ? options.length - 1 : p - 1),
+						);
 					}
 				}}
 				className={cx(
@@ -239,7 +234,9 @@ export function Select({
 						}
 						if (e.key === "ArrowDown") {
 							e.preventDefault();
-							setActiveIndex((p) => Math.min(options.length - 1, p < 0 ? 0 : p + 1));
+							setActiveIndex((p) =>
+								Math.min(options.length - 1, p < 0 ? 0 : p + 1),
+							);
 							return;
 						}
 						if (e.key === "ArrowUp") {
@@ -257,8 +254,7 @@ export function Select({
 							}
 						}
 					}}
-					className="absolute left-0 top-[calc(100%+6px)] w-full min-w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-dark-card/95 shadow-lg shadow-black/30 backdrop-blur"
-				>
+					className="absolute left-0 top-[calc(100%+6px)] w-full min-w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-dark-card/95 shadow-lg shadow-black/30 backdrop-blur">
 					<div className="max-h-56 overflow-auto py-1">
 						{options.map((opt, idx) => {
 							const isSelected = opt.value === value;
@@ -284,8 +280,7 @@ export function Select({
 											: "text-slate-200 hover:bg-white/6",
 										isSelected && "bg-white/5 text-white",
 										isActive && !opt.disabled && "bg-white/6",
-									)}
-								>
+									)}>
 									<span className="truncate">{opt.label}</span>
 								</button>
 							);

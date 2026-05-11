@@ -1,3 +1,5 @@
+import { DEMO_CHANGE_PASSWORD_CURRENT } from "../const/env";
+
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type MockReply =
@@ -27,6 +29,11 @@ function json(ok: boolean, status: number, body: unknown): MockReply {
 
 function nowIso(): string {
 	return new Date().toISOString();
+}
+
+function nextDemoToken(): string {
+	// Must change between logins so React effects depending on token re-run in the demo.
+	return `demo-token-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function recordTradeGptDemoExchange(params: {
@@ -79,13 +86,14 @@ const store = {
 		fullName: "Demo User",
 		avatar: undefined as string | undefined,
 		role: "user",
-		authProvider: "password",
+		authProvider: "email",
 		emailVerified: true,
 		walletAddress: "0xDEMO000000000000000000000000000000000000",
 		newsKeywords: "bitcoin, ethereum, solana",
 		balance: 42.5,
-		paymentMethod: "pro" as const,
-		billingDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
+		/** Demo dashboard: CryptDocker row shows Free; trial / next billing use null dates. */
+		paymentMethod: "free" as "free" | "pro",
+		billingDate: null as string | null,
 		trialExpiresAt: null as string | null,
 		proGraceUntil: null as string | null,
 		proCancelAtPeriodEnd: false,
@@ -155,6 +163,20 @@ const store = {
 		country: "Japan",
 		location: "Tokyo",
 	})),
+	/** Per-product row for MentalShield in Dashboard → Subscription (not CryptDocker / TradeGPT). */
+	mentalShieldProjectSub: {
+		project: "mentalshield" as const,
+		paymentMethod: "free" as "free" | "pro",
+		billingDate: null as string | null,
+		trialExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString() as
+			| string
+			| null,
+		proGraceUntil: null as string | null,
+		proCancelAtPeriodEnd: false,
+		trialActive: true,
+		trialDaysLeft: 14,
+		nextBillingDate: null as string | null,
+	},
 	tradeGpt: {
 		subscription: {
 			plan: "pro" as "free" | "pro",
@@ -233,6 +255,162 @@ function requireAuth(headers?: Record<string, string>): boolean {
 	return auth.startsWith("Bearer ");
 }
 
+/** Same hostname normalization as the real public site-analysis route. */
+function normalizePublicAnalysisDomain(input: string): string {
+	const trimmed = input.trim();
+	if (!trimmed) return "";
+	const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+	try {
+		const url = new URL(withScheme);
+		return url.hostname.replace(/^www\./i, "").toLowerCase();
+	} catch {
+		return trimmed.replace(/^www\./i, "").toLowerCase();
+	}
+}
+
+/** Known demo address for Wallet Analysis HIGH preset (must match main-demo quick-fill). */
+const DEMO_WALLET_TRUST_DRAINER_LC = "0x463452c356322d463b84891ebda33daed274cb40";
+
+function publicWalletAnalysisDemoData(address: string): Record<string, unknown> {
+	const lower = address.trim().toLowerCase();
+	if (lower === DEMO_WALLET_TRUST_DRAINER_LC) {
+		return {
+			address,
+			score: 70,
+			risk_level: "HIGH",
+			confidence: 1,
+			flags: {
+				sanctioned: false,
+				blacklisted: true,
+				threat_actor: true,
+				smart_money: false,
+			},
+			labels: [
+				"CryptoGuard Engine",
+				"OFAC US Treasury",
+				"CryptoGuard ScamDB",
+				"On-chain analysis",
+			],
+			entity: {
+				name: "Trust Wallet drainer pattern (demo)",
+				type: "drainer",
+				id: "demo-trust-drainer",
+			},
+			signals: [
+				{
+					signal: "Risk Flag",
+					contribution: 0,
+					source: "CryptoGuard",
+					matched_value: "[CryptoGuard] Address on security blacklist",
+				},
+				{
+					signal: "Risk Flag",
+					contribution: 0,
+					source: "CryptoGuard",
+					matched_value: "[CryptoGuard] Address associated with asset theft attacks",
+				},
+				{
+					signal: "Risk Flag",
+					contribution: 0,
+					source: "CryptoGuard",
+					matched_value: "Large single transaction relative to current balance",
+				},
+				{
+					signal: "blacklist doubt",
+					contribution: 0,
+					source: "CryptoGuard",
+					matched_value: "detected",
+				},
+				{
+					signal: "stealing attack",
+					contribution: 0,
+					source: "CryptoGuard",
+					matched_value: "detected",
+				},
+			],
+			recommendation: {
+				action: "BLOCK",
+				summary: "HIGH risk wallet",
+				details:
+					"[CryptoGuard] Address on security blacklist; [CryptoGuard] Address associated with asset theft attacks; Large single transaction relative to current balance",
+			},
+			metadata: { demo: true },
+		};
+	}
+	return {
+		address,
+		score: 40,
+		risk_level: "MEDIUM",
+		confidence: 1,
+		flags: {
+			sanctioned: false,
+			blacklisted: false,
+			threat_actor: true,
+			smart_money: false,
+		},
+		labels: [
+			"CryptoGuard Engine",
+			"OFAC US Treasury",
+			"CryptoGuard Scam DB",
+			"On-chain analysis",
+		],
+		entity: {
+			name: "Flagged counterparty (demo)",
+			type: "threat_intelligence",
+			id: "demo-medium",
+		},
+		signals: [
+			{
+				signal: "Risk Flag",
+				contribution: 0,
+				source: "CryptoGuard",
+				matched_value: "[CryptoGuard] Address associated with asset theft attacks",
+			},
+			{
+				signal: "Risk Flag",
+				contribution: 0,
+				source: "CryptoGuard",
+				matched_value: "Large single transaction relative to current balance",
+			},
+			{
+				signal: "stealing attack",
+				contribution: 0,
+				source: "CryptoGuard",
+				matched_value: "detected",
+			},
+		],
+		recommendation: {
+			summary: "MEDIUM risk wallet",
+			details:
+				"[CryptoGuard] Address associated with asset theft attacks; Large single transaction relative to current balance",
+		},
+		metadata: { demo: true },
+	};
+}
+
+function parsePublicNewsKeywords(body: unknown, query: URLSearchParams): string[] {
+	const b = (body ?? {}) as { keywords?: unknown };
+	if (Array.isArray(b.keywords)) {
+		return b.keywords.map((k) => String(k ?? "").trim()).filter(Boolean).slice(0, 8);
+	}
+	if (typeof b.keywords === "string") {
+		return b.keywords
+			.split(/[,#]/)
+			.map((k) => k.trim())
+			.filter(Boolean)
+			.slice(0, 8);
+	}
+	const q = query.get("keywords");
+	if (typeof q === "string" && q.trim()) {
+		return q
+			.split(/[,#]/)
+			.map((k) => k.trim())
+			.filter(Boolean)
+			.slice(0, 8);
+	}
+	return [];
+}
+
 export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 	const method = req.method;
 	const { path, query } = normalizePath(req.url);
@@ -243,15 +421,16 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 	if (path === "/auth/login" && method === "POST") {
 		const b = (body ?? {}) as { email?: string };
 		const email = String(b.email ?? store.user.email).trim() || store.user.email;
-		store.user = { ...store.user, email };
+		store.user = { ...store.user, email, authProvider: "email" };
+		const token = nextDemoToken();
 		return json(true, 200, {
-			token: "demo-token",
+			token,
 			user: {
 				uuid: store.user.uuid,
 				email: store.user.email,
 				fullName: store.user.fullName,
 				avatar: store.user.avatar,
-				authProvider: "password",
+				authProvider: "email",
 				onboarded: true,
 			},
 		});
@@ -260,24 +439,32 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 	if (path === "/auth/register" && method === "POST") {
 		const b = (body ?? {}) as { email?: string; fullName?: string };
 		const email = String(b.email ?? store.user.email).trim() || store.user.email;
-		store.user = { ...store.user, email, fullName: String(b.fullName ?? store.user.fullName) || store.user.fullName };
+		store.user = {
+			...store.user,
+			email,
+			fullName: String(b.fullName ?? store.user.fullName) || store.user.fullName,
+			authProvider: "email",
+		};
+		const token = nextDemoToken();
 		return json(true, 200, {
 			requiresVerification: false,
-			token: "demo-token",
+			token,
 			user: {
 				uuid: store.user.uuid,
 				email: store.user.email,
 				fullName: store.user.fullName,
 				avatar: store.user.avatar,
-				authProvider: "password",
+				authProvider: "email",
 				onboarded: true,
 			},
 		});
 	}
 
 	if (path === "/auth/google" && method === "POST") {
+		store.user = { ...store.user, authProvider: "google" };
+		const token = nextDemoToken();
 		return json(true, 200, {
-			token: "demo-token",
+			token,
 			user: {
 				uuid: store.user.uuid,
 				email: store.user.email,
@@ -290,8 +477,10 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 	}
 
 	if (path === "/auth/google/code" && method === "POST") {
+		const token = nextDemoToken();
+		store.user = { ...store.user, authProvider: "google" };
 		return json(true, 200, {
-			token: "demo-token",
+			token,
 			user: {
 				uuid: store.user.uuid,
 				email: store.user.email,
@@ -301,6 +490,22 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 				onboarded: true,
 			},
 		});
+	}
+
+	if (path === "/auth/change-password" && method === "POST") {
+		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
+		const b = (body ?? {}) as {
+			currentPassword?: string;
+			newPassword?: string;
+			confirmPassword?: string;
+		};
+		if (String(b.currentPassword ?? "") !== DEMO_CHANGE_PASSWORD_CURRENT) {
+			return json(false, 400, { message: "Current password is incorrect." });
+		}
+		if (!b.newPassword || String(b.newPassword) !== String(b.confirmPassword ?? "")) {
+			return json(false, 400, { message: "Passwords do not match." });
+		}
+		return json(true, 200, { message: "Password changed successfully (mock)." });
 	}
 
 	if (path === "/user" && method === "GET") {
@@ -377,6 +582,187 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 			message: "Pro will cancel at period end (mock).",
 			user: store.user,
 		});
+	}
+
+	if (path === "/constants/price" && method === "GET") {
+		return json(true, 200, {
+			price: {
+				CryptDocker: 12,
+				TradeGPT: 29,
+				MentalShield: 15,
+			},
+		});
+	}
+
+	// ── Public marketing tools (/public/*) — used by Wallet / Site / News analysis pages ──
+	if (path.startsWith("/public/wallet-analysis/") && method === "GET") {
+		const encoded = path.slice("/public/wallet-analysis/".length);
+		let address = encoded;
+		try {
+			address = decodeURIComponent(encoded);
+		} catch {
+			// keep raw segment
+		}
+		address = address.trim();
+		if (!address) {
+			return json(false, 400, { success: false, error: "address is required" });
+		}
+		return json(true, 200, {
+			success: true,
+			data: publicWalletAnalysisDemoData(address),
+		});
+	}
+
+	if (path === "/public/wallet-analysis" && method === "POST") {
+		const b = (body ?? {}) as { address?: string };
+		const address = String(b.address ?? "").trim();
+		if (!address) {
+			return json(false, 400, { success: false, error: "address is required" });
+		}
+		return mockBackendRequest({
+			...req,
+			method: "GET",
+			url: `/public/wallet-analysis/${encodeURIComponent(address)}`,
+		});
+	}
+
+	if (path === "/public/site-analysis" && method === "POST") {
+		const b = (body ?? {}) as { url?: string; domain?: string };
+		const raw = String(b.url ?? b.domain ?? "").trim();
+		const domain = normalizePublicAnalysisDomain(raw);
+		if (!raw) {
+			return json(false, 400, { success: false, error: "domain or url is required" });
+		}
+		if (!domain || !domain.includes(".")) {
+			return json(false, 400, { success: false, error: "invalid domain" });
+		}
+		const label = domain.split(".")[0] || domain;
+		return json(true, 200, {
+			success: true,
+			domain,
+			summary: `Demo headlines for **${domain}**: product updates, regulation, and market chatter are summarized here without calling external SERP or OpenAI.`,
+			sentiment: "neutral",
+			takeaway: `Treat this as a UI preview only; connect to the live app for real news-driven sentiment.`,
+			items: [
+				{
+					title: `${label} in focus: what traders watched this week (demo)`,
+					link: `https://${domain}`,
+					snippet: `Synthetic snippet for the CryptDocker demo build.`,
+					date: new Date().toISOString().slice(0, 10),
+					source: "Demo feed",
+				},
+				{
+					title: `Industry roundup mentions ${domain} alongside majors (demo)`,
+					link: `https://${domain}/news`,
+					snippet: "Second mock article so the list layout renders realistically.",
+					date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+					source: "Demo feed",
+				},
+			],
+		});
+	}
+
+	if (path.startsWith("/public/site-analysis/") && method === "GET") {
+		const encoded = path.slice("/public/site-analysis/".length);
+		let domain = encoded;
+		try {
+			domain = decodeURIComponent(encoded);
+		} catch {
+			// keep raw
+		}
+		return mockBackendRequest({
+			...req,
+			method: "POST",
+			url: "/public/site-analysis",
+			body: JSON.stringify({ domain }),
+		});
+	}
+
+	if (path === "/public/news-analysis" && method === "POST") {
+		const keywords = parsePublicNewsKeywords(body, query);
+		if (keywords.length === 0) {
+			return json(true, 200, {
+				success: true,
+				summary: "Add at least one keyword for a richer demo story.",
+				sentiment: "neutral",
+				takeaway: "Try suggested tags like Bitcoin or DeFi.",
+				items: [],
+			});
+		}
+		const topic = keywords.join(", ");
+		return json(true, 200, {
+			success: true,
+			summary: `Demo digest for **${topic}**: narratives are mixed; this text stands in for OpenAI + SERP on the production site.`,
+			sentiment: "bullish",
+			takeaway: "Mock data only — use the live CryptDocker build for real sentiment.",
+			items: keywords.slice(0, 3).map((kw, i) => ({
+				title: `${kw}: weekly flow and positioning (demo headline ${i + 1})`,
+				link: "https://cryptdocker.com",
+				snippet: `Illustrative snippet for keyword “${kw}”.`,
+				date: new Date(Date.now() - i * 43200000).toISOString().slice(0, 10),
+				source: "CryptDocker demo",
+			})),
+		});
+	}
+
+	if (path === "/public/news-analysis" && method === "GET") {
+		return mockBackendRequest({
+			...req,
+			method: "POST",
+			body: JSON.stringify({ keywords: parsePublicNewsKeywords(body, query) }),
+		});
+	}
+
+	if (path === "/user/subscriptions" && method === "GET") {
+		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
+		const s = store.mentalShieldProjectSub;
+		const trialEnd = s.trialExpiresAt ? new Date(s.trialExpiresAt).getTime() : NaN;
+		const trialStillActive =
+			s.trialActive &&
+			Number.isFinite(trialEnd) &&
+			trialEnd > Date.now() &&
+			s.paymentMethod !== "pro";
+		const trialDaysLeft = trialStillActive
+			? Math.max(0, Math.ceil((trialEnd - Date.now()) / (1000 * 60 * 60 * 24)))
+			: s.trialDaysLeft;
+		return json(true, 200, {
+			subscriptions: [
+				{
+					...s,
+					trialActive: trialStillActive,
+					trialDaysLeft,
+				},
+			],
+		});
+	}
+
+	const subProjectAction = path.match(/^\/user\/subscriptions\/([^/]+)\/(upgrade-pro|cancel-pro)$/);
+	if (subProjectAction && method === "POST") {
+		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
+		const project = String(subProjectAction[1] ?? "").toLowerCase();
+		const action = subProjectAction[2];
+		if (project !== "mentalshield") {
+			return json(false, 404, { message: "Unknown project (mock)." });
+		}
+		if (action === "upgrade-pro") {
+			const nextBill = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+			store.mentalShieldProjectSub = {
+				...store.mentalShieldProjectSub,
+				paymentMethod: "pro",
+				trialActive: false,
+				trialExpiresAt: null,
+				trialDaysLeft: 0,
+				billingDate: nextBill,
+				nextBillingDate: nextBill,
+				proCancelAtPeriodEnd: false,
+			};
+		} else {
+			store.mentalShieldProjectSub = {
+				...store.mentalShieldProjectSub,
+				proCancelAtPeriodEnd: true,
+			};
+		}
+		return json(true, 200, { message: "Subscription updated (mock).", user: store.user });
 	}
 
 	if (path === "/workspace" && method === "GET") {

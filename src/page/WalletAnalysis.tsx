@@ -21,6 +21,10 @@ import {
 const EVM_ADDRESS_REGEX = /^0x[0-9a-fA-F]{40}$/;
 const EVM_TX_REGEX = /^0x[0-9a-fA-F]{64}$/;
 
+/** Shown as quick-fill rows when the address field is focused and empty (demo UX). */
+const KYBERSWAP_EXPLOIT_ADDRESS = "0xC9B826BAD20872EB29f9b1D8af4BefE8460b50c6";
+const TRUST_WALLET_DRAINER_ADDRESS = "0x463452c356322d463b84891ebda33daed274cb40";
+
 const FLAG_LABELS: Record<string, string> = {
 	sanctioned: "Sanctioned",
 	blacklisted: "Blacklisted",
@@ -69,6 +73,7 @@ export const WalletAnalysis: React.FC = () => {
 	const [error, setError] = useState<string | null>(null);
 	const [data, setData] = useState<RadarRiskResponse | null>(null);
 	const [showSignals, setShowSignals] = useState(false);
+	const [addressFocused, setAddressFocused] = useState(false);
 
 	useEffect(() => {
 		if (!authed) setSignInOpen(true);
@@ -76,6 +81,7 @@ export const WalletAnalysis: React.FC = () => {
 
 	const trimmed = input.trim();
 	const valid = isValidPayload(trimmed);
+	const showDemoWalletHints = addressFocused && trimmed === "";
 
 	const onSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -133,15 +139,64 @@ export const WalletAnalysis: React.FC = () => {
 							Wallet or contract address
 						</label>
 						<div className="flex flex-col sm:flex-row gap-3">
-							<input
-								type="text"
-								autoComplete="off"
-								spellCheck={false}
-								placeholder="0x… (address or tx hash)"
-								value={input}
-								onChange={(e) => setInput(e.target.value)}
-								className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-white/8 bg-white/4 text-slate-200 placeholder:text-slate-600 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-500/50 transition"
-							/>
+							<div className="relative flex-1 min-w-0">
+								<input
+									type="text"
+									autoComplete="off"
+									spellCheck={false}
+									placeholder="0x… (address or tx hash)"
+									value={input}
+									onChange={(e) => setInput(e.target.value)}
+									onFocus={() => setAddressFocused(true)}
+									onBlur={() => setAddressFocused(false)}
+									aria-describedby={
+										showDemoWalletHints ? "wallet-demo-address-hints" : undefined
+									}
+									className="w-full px-4 py-3 rounded-xl border border-white/8 bg-white/4 text-slate-200 placeholder:text-slate-600 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/30 focus:border-teal-500/50 transition"
+								/>
+								{showDemoWalletHints && (
+									<motion.div
+										id="wallet-demo-address-hints"
+										role="group"
+										aria-label="Example addresses"
+										initial={{ opacity: 0, y: 4 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ duration: 0.15 }}
+										className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[min(70vh,22rem)] overflow-y-auto rounded-xl border border-white/10 bg-dark-surface/95 px-3 py-2.5 shadow-lg shadow-black/30 backdrop-blur-sm"
+									>
+										<div>
+											<p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+												KyberSwap Exploit Address
+											</p>
+											<button
+												type="button"
+												onMouseDown={(e) => e.preventDefault()}
+												onClick={() => setInput(KYBERSWAP_EXPLOIT_ADDRESS)}
+												className="mt-1 w-full text-left font-mono text-xs text-teal-300 hover:text-teal-200 hover:underline cursor-pointer wrap-break-word"
+											>
+												{KYBERSWAP_EXPLOIT_ADDRESS}
+											</button>
+										</div>
+										<div
+											className="my-2.5 border-t border-white/10"
+											aria-hidden
+										/>
+										<div>
+											<p className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+												Trust Wallet Drainer Address
+											</p>
+											<button
+												type="button"
+												onMouseDown={(e) => e.preventDefault()}
+												onClick={() => setInput(TRUST_WALLET_DRAINER_ADDRESS)}
+												className="mt-1 w-full text-left font-mono text-xs text-teal-300 hover:text-teal-200 hover:underline cursor-pointer wrap-break-word"
+											>
+												{TRUST_WALLET_DRAINER_ADDRESS}
+											</button>
+										</div>
+									</motion.div>
+								)}
+							</div>
 							<Button
 								type="submit"
 								size="lg"

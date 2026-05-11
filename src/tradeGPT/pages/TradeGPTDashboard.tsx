@@ -79,12 +79,18 @@ export function TradeGPTDashboard() {
   >({});
 
   const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = bottomRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "end" });
+      });
+    });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streaming, scrollToBottom]);
+  }, [messages, streaming, sending, scrollToBottom]);
 
   const loadConversation = useCallback(
     async (id: string, skipUrlUpdate = false) => {
@@ -514,6 +520,8 @@ export function TradeGPTDashboard() {
         <ChatMessageList
           messages={messages}
           streamingContent={streaming}
+          sending={sending}
+          scrollAnchorRef={bottomRef}
           mode={mode}
           modeOptions={modes}
           conversationId={activeId ?? ""}
@@ -524,7 +532,6 @@ export function TradeGPTDashboard() {
           followUpByMessageId={followUpByMessageId}
           followUpStatusByMessageId={followUpStatusByMessageId}
         />
-        <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
 
         <ChatComposer
           disabled={sending || !activeId}

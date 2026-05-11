@@ -1,5 +1,6 @@
 import { getApiErrorMessage } from "./apiError";
 import { mockBackendRequest, recordTradeGptDemoExchange } from "../../mocks/mockBackend";
+import { pickDemoMockAssistantReply } from "./demoMockAssistantReplies";
 
 async function mockJson<T = any>(url: string, init?: RequestInit): Promise<T> {
   const method = String(init?.method ?? "GET").toUpperCase();
@@ -207,6 +208,14 @@ export type StreamEvent =
     }
   | { type: "error"; message: string };
 
+/** Demo-only pause so the chat UI shows ~300–500ms of loading before the mock stream starts. */
+function delayDemoAssistantMs(): Promise<void> {
+  const min = 300;
+  const max = 500;
+  const ms = min + Math.floor(Math.random() * (max - min + 1));
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export async function streamAssistantReply(
   token: string,
   conversationId: string,
@@ -217,11 +226,14 @@ export async function streamAssistantReply(
   if (!token) throw new Error("Session expired.");
   if (!conversationId) throw new Error("Conversation not found.");
 
+  const picked = pickDemoMockAssistantReply(conversationId, content);
   const assistantText =
-    "You're using the TradeGPT demo.\n\n" +
-    "This demo doesn't generate real AI responses yet.\n\n" +
-    "To use the full TradeGPT experience, open the live site:\n" +
-    "https://cryptdocker.com/trade-gpt";
+    picked.body +
+    "\n\n---\n\n" +
+    "*This TradeGPT **demo** rotates predefined responses. " +
+    "For real AI answers, use the live app at [cryptdocker.com](https://cryptdocker.com/trade-gpt).*";
+
+  await delayDemoAssistantMs();
 
   const { assistantMessageId } = recordTradeGptDemoExchange({
     conversationId,
@@ -229,13 +241,13 @@ export async function streamAssistantReply(
     assistantText,
   });
 
-  // Emit a tiny "stream" so the UI visibly updates.
+  // Emit a chunked "stream" so the UI visibly updates (words / whitespace).
   const chunks = assistantText.split(/(\s+)/).filter(Boolean);
 
   for (const c of chunks) onEvent({ type: "delta", content: c });
   onEvent({
     type: "done",
-    title: "Demo reply",
+    title: picked.title,
     model: "mock",
     usedWebSearch: false,
     assistantMessageId,
