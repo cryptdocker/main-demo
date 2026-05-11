@@ -35,6 +35,10 @@ const DASHBOARD_MAIN_TABS: {
 	{ id: "signins", label: "Sign In History", icon: <IoGlobeOutline className="text-base" /> },
 ];
 
+/** Main content surface under the tab bar (matches Download highlighted card). */
+const DASHBOARD_TAB_PANEL_CLASS =
+	"relative rounded-2xl glow-teal glass-medium border-teal-500/30 space-y-5 h-[calc(100vh-310px)]";
+
 const getMinimumTopUpAmount = (ticker: string): number => {
 	const normalized = ticker.toLowerCase();
 	if (normalized === "usdt-trc20") return 10;
@@ -307,7 +311,7 @@ export const Dashboard: React.FC = () => {
 
 					{mainTab === "user" && (
 						<div
-							className="space-y-5 h-[calc(100vh-310px)]"
+							className={DASHBOARD_TAB_PANEL_CLASS}
 							role="tabpanel"
 							aria-labelledby="dashboard-tab-user">
 							<AccountSection
@@ -326,7 +330,10 @@ export const Dashboard: React.FC = () => {
 					)}
 
 					{mainTab === "billing" && (
-						<div role="tabpanel"className="space-y-5 h-[calc(100vh-310px)]" aria-labelledby="dashboard-tab-billing">
+						<div
+							role="tabpanel"
+							className={DASHBOARD_TAB_PANEL_CLASS}
+							aria-labelledby="dashboard-tab-billing">
 							<PlanBillingSection
 								me={me}
 								plan={plan}
@@ -351,7 +358,7 @@ export const Dashboard: React.FC = () => {
 					{mainTab === "subscription" && (
 						<div
 							role="tabpanel"
-							className="space-y-5 h-[calc(100vh-310px)]"
+							className={DASHBOARD_TAB_PANEL_CLASS}
 							aria-labelledby="dashboard-tab-subscription">
 							{token && (
 								<SubscriptionSection
@@ -368,7 +375,10 @@ export const Dashboard: React.FC = () => {
 					)}
 
 					{mainTab === "signins" && (
-						<div role="tabpanel"className="space-y-5 h-[calc(100vh-310px)]" aria-labelledby="dashboard-tab-signins">
+						<div
+							role="tabpanel"
+							className={DASHBOARD_TAB_PANEL_CLASS}
+							aria-labelledby="dashboard-tab-signins">
 							<DevicesSection />
 						</div>
 					)}
