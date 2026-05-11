@@ -79,6 +79,15 @@ function safeJsonParse(value: unknown): unknown {
 	}
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result ?? ""));
+		reader.onerror = () => reject(reader.error ?? new Error("Failed to read blob"));
+		reader.readAsDataURL(blob);
+	});
+}
+
 const store = {
 	user: {
 		uuid: "demo-user-uuid",
@@ -544,8 +553,14 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 
 	if (path === "/user/avatar" && method === "POST") {
 		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
-		store.user.avatar = "https://i.pravatar.cc/200?img=68";
-		return json(true, 200, { message: "Avatar uploaded (mock).", avatar: store.user.avatar });
+		const form = body instanceof FormData ? body : null;
+		const avatarEntry = form?.get("avatar");
+		const avatarBlob = avatarEntry instanceof Blob ? avatarEntry : null;
+		if (!avatarBlob) return json(false, 400, { message: "Avatar file is required." });
+
+		const dataUrl = await blobToDataUrl(avatarBlob);
+		store.user.avatar = dataUrl;
+		return json(true, 200, { message: "Avatar uploaded (demo).", avatar: store.user.avatar });
 	}
 
 	if (path.startsWith("/user/signin-history") && method === "GET") {
