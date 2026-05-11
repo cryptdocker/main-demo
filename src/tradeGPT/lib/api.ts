@@ -43,6 +43,10 @@ export type SubscriptionInfo = {
   trialActive: boolean;
   trialDaysLeft: number;
   trialEndsAt: string;
+  /** ISO timestamp for next renewal when on paid plan (or null). */
+  nextBillingDate?: string | null;
+  /** If true, cancellation is scheduled at period end (downgrade disabled). */
+  proCancelAtPeriodEnd?: boolean;
   accountCreatedAt: string;
   balance: number;
 };
@@ -143,6 +147,16 @@ export async function apiUpgradeSubscription(token: string): Promise<{
   message?: string;
 }> {
   return await mockJson(`/trade-gpt/subscription/upgrade`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function apiDowngradeSubscription(token: string): Promise<{
+  subscription: SubscriptionInfo;
+  message?: string;
+}> {
+  return await mockJson(`/trade-gpt/subscription/downgrade`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });

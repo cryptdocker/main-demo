@@ -157,11 +157,15 @@ const store = {
 	})),
 	tradeGpt: {
 		subscription: {
-			plan: "pro" as const,
+			plan: "pro" as "free" | "pro",
 			label: "Pro",
 			trialActive: false,
 			trialDaysLeft: 0,
 			trialEndsAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
+			nextBillingDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString() as
+				| string
+				| null,
+			proCancelAtPeriodEnd: false,
 			accountCreatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(),
 			balance: 42.5,
 		},
@@ -601,8 +605,27 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 
 	if (path === "/trade-gpt/subscription/upgrade" && method === "POST") {
 		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
-		store.tradeGpt.subscription = { ...store.tradeGpt.subscription, plan: "pro", label: "Pro" };
+		store.tradeGpt.subscription = {
+			...store.tradeGpt.subscription,
+			plan: "pro",
+			label: "Pro",
+			nextBillingDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+			proCancelAtPeriodEnd: false,
+		};
 		return json(true, 200, { subscription: store.tradeGpt.subscription, message: "Upgraded (mock)." });
+	}
+
+	if (path === "/trade-gpt/subscription/downgrade" && method === "POST") {
+		if (!requireAuth(headers)) return json(false, 401, { message: "Unauthorized" });
+		store.tradeGpt.subscription = {
+			...store.tradeGpt.subscription,
+			proCancelAtPeriodEnd: true,
+			label: "Pro — Cancellation Scheduled",
+		};
+		return json(true, 200, {
+			subscription: store.tradeGpt.subscription,
+			message: "Downgraded (mock).",
+		});
 	}
 
 	if (path === "/payment" && method === "POST") {

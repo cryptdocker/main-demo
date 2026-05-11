@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FiRefreshCw } from "react-icons/fi";
 import { useTradeGPTUser } from "../context/TradeGPTUserContext";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
@@ -10,7 +9,9 @@ import { ChatComposer } from "../components/chat/ChatComposer";
 import {
   createConversation,
   deleteConversation,
+  deleteAllConversations,
   fetchModes,
+  buildChatHistoryExportText,
   getConversation,
   listConversations,
   patchConversationMode,
@@ -21,12 +22,6 @@ import {
 } from "../lib/chatApi";
 import { isMongoObjectId } from "../lib/mongoId";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { SettingsView, isValidSettingsSection, type SettingsSectionId } from "./SettingsPage";
-import {
-  backdropFadeTransition,
-  modalPanelExitTransition,
-  modalPanelTransition,
-} from "../config/motion";
 import { getDisplayErrorMessage, toUserFriendlyErrorMessage } from "../lib/apiError";
 import { PATH } from "../../const";
 import { InlineSupportErrorText } from "../components/common/InlineSupportErrorText";
@@ -47,56 +42,11 @@ async function copyToClipboard(text: string): Promise<void> {
 }
 
 export function TradeGPTDashboard() {
-  const reduceMotion = useReducedMotion();
-  const { token, user, logout, subscription } = useTradeGPTUser();
+  const { token, user } = useTradeGPTUser();
   const navigate = useNavigate();
   const { conversationId: urlConversationId } = useParams<{ conversationId?: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const settingsModalOpen = searchParams.has("settings");
-  const settingsSection = useMemo((): SettingsSectionId => {
-    const raw = searchParams.get("settings") ?? "";
-    if (!raw) return "general";
-    return isValidSettingsSection(raw) ? raw : "general";
-  }, [searchParams]);
-
-  const openSettings = useCallback(
-    (id: SettingsSectionId = "general") => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("settings", id);
-          return next;
-        },
-        { replace: false },
-      );
-    },
-    [setSearchParams],
-  );
-
-  const closeSettings = useCallback(() => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("settings");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [setSearchParams]);
-
-  const setSettingsSection = useCallback(
-    (id: SettingsSectionId) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("settings", id);
-          return next;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
+  // keep hook usage stable (some routes may still include query params)
+  useSearchParams();
   const [modes, setModes] = useState<TradeModeMeta[]>([]);
   const [conversations, setConversations] = useState<
     { id: string; title: string; mode: TradeModeId; messageCount?: number }[]
@@ -343,6 +293,49 @@ export function TradeGPTDashboard() {
     [token, activeId]
   );
 
+  const handleExportData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const text = await buildChatHistoryExportText(token);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tradegpt-chat-export-${stamp}.txt`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setLoadError(getDisplayErrorMessage(e, "Export failed"));
+    }
+  }, [token]);
+
+  const handleDeleteAllConversations = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoadError(null);
+      setStreaming("");
+      setFollowUpByMessageId({});
+      setFollowUpStatusByMessageId({});
+
+      await deleteAllConversations(token);
+      const list = await refreshList();
+
+      if (list.length) {
+        await loadConversation(list[0].id);
+      } else {
+        const created = await createConversation(token, mode);
+        await refreshList();
+        await loadConversation(created.id);
+      }
+    } catch (e) {
+      setLoadError(getDisplayErrorMessage(e, "Failed to delete conversations"));
+    }
+  }, [token, refreshList, loadConversation, mode]);
+
   const handleSend = useCallback(
     async (text: string) => {
       if (!token || !activeId) return;
@@ -491,11 +484,8 @@ export function TradeGPTDashboard() {
         onNewChat={handleNewChatWithMobileClose}
         onSelect={handleSelectWithMobileClose}
         onDelete={handleDelete}
-        userEmail={user.email}
-        subscription={subscription}
-        onLogout={logout}
-        onOpenSettings={() => openSettings("general")}
-        onUpgrade={() => openSettings("subscription")}
+        onExportData={handleExportData}
+        onDeleteAllConversations={handleDeleteAllConversations}
         collapsed={mdUp ? sidebarCollapsed : false}
         onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         isMobileLayout={!mdUp}
@@ -551,53 +541,6 @@ export function TradeGPTDashboard() {
       </div>
 
     </div>
-
-    <AnimatePresence>
-      {settingsModalOpen && (
-        <>
-          <motion.button
-            key="settings-backdrop"
-            type="button"
-            aria-label="Close settings"
-            className="fixed inset-0 z-89 cursor-pointer border-0 bg-slate-950/55 p-0 backdrop-blur-[2px] motion-reduce:backdrop-blur-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={backdropFadeTransition(reduceMotion)}
-            onClick={closeSettings}
-          />
-          <div className="pointer-events-none fixed inset-0 z-90 flex items-center justify-center p-3 sm:p-5">
-            <motion.div
-              key="settings-panel"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="settings-modal-title"
-              className="pointer-events-auto relative flex h-[min(880px,90dvh)] min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-th-border bg-th-bg shadow-2xl"
-              initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={
-                reduceMotion
-                  ? { opacity: 0, transition: modalPanelExitTransition(true) }
-                  : {
-                      opacity: 0,
-                      y: 16,
-                      scale: 0.97,
-                      transition: modalPanelExitTransition(false),
-                    }
-              }
-              transition={modalPanelTransition(reduceMotion)}
-            >
-              <SettingsView
-                variant="modal"
-                section={settingsSection}
-                onSectionChange={setSettingsSection}
-                onClose={closeSettings}
-              />
-            </motion.div>
-          </div>
-        </>
-      )}
-    </AnimatePresence>
     </>
   );
 }

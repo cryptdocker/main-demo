@@ -97,51 +97,46 @@ function HistoryTable({
 
 	return (
 		<div className="rounded-2xl border border-white/8 bg-white/3 overflow-hidden">
-			<button
-				type="button"
-				onClick={onToggle}
-				aria-expanded={expanded}
-				className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-white/8"
-			>
-				<span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-200">
+			<div className="w-full flex items-center justify-between gap-3 px-4 py-3 border-b border-white/8">
+				<button
+					type="button"
+					onClick={onToggle}
+					aria-expanded={expanded}
+					className="flex-1 min-w-0 inline-flex items-center gap-2 text-sm font-semibold text-slate-200 text-left"
+				>
 					<span className="text-slate-400">{icon}</span>
-					<span>{title}</span>
-				</span>
-				<span className="inline-flex items-center gap-3">
-					{expanded && (
-						<span className="inline-flex items-center gap-2">
-							<Badge>
-								{total} total · Page {page}/{maxPage}
-							</Badge>
-							<button
-								type="button"
-								onClick={(e) => {
-									e.stopPropagation();
-									onPrev();
-								}}
-								disabled={loading || page <= 1}
-								aria-label="Previous page"
-								className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/10 bg-dark-card/40 text-slate-200 disabled:opacity-50">
-								<IoChevronBackOutline />
-							</button>
-							<button
-								type="button"
-								onClick={(e) => {
-									e.stopPropagation();
-									onNext();
-								}}
-								disabled={loading || page >= maxPage}
-								aria-label="Next page"
-								className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/10 bg-dark-card/40 text-slate-200 disabled:opacity-50">
-								<IoChevronForwardOutline />
-							</button>
-						</span>
-					)}
+					<span className="truncate">{title}</span>
 					<IoChevronDownOutline
-						className={`text-slate-400 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+						className={`ml-auto shrink-0 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
 					/>
-				</span>
-			</button>
+				</button>
+
+				{expanded && (
+					<div className="shrink-0 inline-flex items-center gap-2">
+						<Badge>
+							{total} total · Page {page}/{maxPage}
+						</Badge>
+						<button
+							type="button"
+							onClick={onPrev}
+							disabled={loading || page <= 1}
+							aria-label="Previous page"
+							className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/10 bg-dark-card/40 text-slate-200 disabled:opacity-50"
+						>
+							<IoChevronBackOutline />
+						</button>
+						<button
+							type="button"
+							onClick={onNext}
+							disabled={loading || page >= maxPage}
+							aria-label="Next page"
+							className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-white/10 bg-dark-card/40 text-slate-200 disabled:opacity-50"
+						>
+							<IoChevronForwardOutline />
+						</button>
+					</div>
+				)}
+			</div>
 
 			<AnimatePresence initial={false}>
 				{expanded && (

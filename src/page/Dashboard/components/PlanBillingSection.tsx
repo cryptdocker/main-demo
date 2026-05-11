@@ -1,13 +1,10 @@
 import { Button } from "../../../component/Button";
 import type { MeResponse } from "../../../services/user.service";
 import {
-	IoCalendarOutline,
 	IoCashOutline,
 	IoCheckmarkCircleOutline,
-	IoCloseCircleOutline,
 	IoCopyOutline,
 	IoHourglassOutline,
-	IoSparklesOutline,
 } from "react-icons/io5";
 import { cx, fmt } from "./shared";
 import { Badge, Section, Select, Stat } from "./ui";
@@ -17,14 +14,10 @@ import { usePaymentQr } from "./usePaymentQr";
 export function PlanBillingSection({
 	me,
 	plan,
-	onUpgrade,
-	onCancelPro,
 	topUp,
 }: {
 	me: MeResponse | null;
 	plan: { isPro: boolean; trialActive: boolean; graceActive: boolean };
-	onUpgrade: () => void;
-	onCancelPro: () => void;
 	topUp: {
 		amount: string;
 		onAmountChange: (v: string) => void;
@@ -67,25 +60,9 @@ export function PlanBillingSection({
 							</p>
 						</div>
 
-						{!plan.isPro && (
-							<div className="shrink-0 pt-0.5">
-								<Button size="sm" onClick={onUpgrade}>
-									<span className="inline-flex items-center gap-1.5">
-										<IoSparklesOutline className="text-base" />
-										Upgrade to Pro
-									</span>
-								</Button>
-							</div>
-						)}
+						{/* Upgrade button removed */}
 					</div>
 				</div>
-				{plan.isPro && (
-					<Stat
-						label="Next billing"
-						icon={<IoCalendarOutline className="text-sm" />}
-						value={fmt(me?.billingDate)}
-					/>
-				)}
 				{plan.trialActive && (
 					<Stat
 						label="Trial ends"
@@ -100,26 +77,6 @@ export function PlanBillingSection({
 						value={fmt(me?.proGraceUntil)}
 					/>
 				)}
-			</div>
-
-			<div className="flex flex-wrap gap-2">
-				{plan.isPro ? (
-					me?.proCancelAtPeriodEnd ? (
-						<Badge variant="warn">
-							<span className="inline-flex items-center gap-1.5">
-								<IoHourglassOutline className="text-sm" />
-								Cancellation scheduled
-							</span>
-						</Badge>
-					) : (
-						<Button size="sm" variant="outline" onClick={onCancelPro}>
-							<span className="inline-flex items-center gap-1.5">
-								<IoCloseCircleOutline className="text-base" />
-								Cancel at period end
-							</span>
-						</Button>
-					)
-				) : null}
 			</div>
 
 			<div className="mt-4 rounded-2xl border border-white/10 bg-dark-card/40 p-4">

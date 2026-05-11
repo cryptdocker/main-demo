@@ -76,3 +76,20 @@ export async function loginWithGoogleCode(params: {
 	return { user: normalizeUser(res.user), token: res.token };
 }
 
+export async function changePassword(params: {
+	token: string;
+	currentPassword: string;
+	newPassword: string;
+	confirmPassword: string;
+}): Promise<{ message: string }> {
+	return await apiFetch<{ message: string }>("/auth/change-password", {
+		method: "POST",
+		headers: { Authorization: `Bearer ${params.token}` },
+		body: JSON.stringify({
+			currentPassword: params.currentPassword,
+			newPassword: params.newPassword,
+			confirmPassword: params.confirmPassword,
+		}),
+	});
+}
+

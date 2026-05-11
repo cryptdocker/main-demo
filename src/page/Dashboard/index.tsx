@@ -13,18 +13,25 @@ import {
 	AccountSection,
 	DevicesSection,
 	PlanBillingSection,
+	SubscriptionSection,
 } from "./components/DashboardSections";
-import { IoCashOutline, IoGlobeOutline, IoPersonOutline } from "react-icons/io5";
+import {
+	IoCashOutline,
+	IoGlobeOutline,
+	IoPersonOutline,
+	IoPricetagOutline,
+} from "react-icons/io5";
 
-type DashboardMainTab = "user" | "billing" | "signins";
+type DashboardMainTab = "user" | "billing" | "subscription" | "signins";
 
 const DASHBOARD_MAIN_TABS: {
 	id: DashboardMainTab;
 	label: string;
 	icon: React.ReactNode;
 }[] = [
-	{ id: "user", label: "Account", icon: <IoPersonOutline className="text-base" /> },
+	{ id: "user", label: "Credential", icon: <IoPersonOutline className="text-base" /> },
 	{ id: "billing", label: "Plan & Billing", icon: <IoCashOutline className="text-base" /> },
+	{ id: "subscription", label: "Subscription", icon: <IoPricetagOutline className="text-base" /> },
 	{ id: "signins", label: "Sign In History", icon: <IoGlobeOutline className="text-base" /> },
 ];
 
@@ -171,7 +178,6 @@ export const Dashboard: React.FC = () => {
 
 	const cancelPro = async () => {
 		if (!token) return;
-		if (!confirm("Cancel Pro at the end of this billing period?")) return;
 		setError(null);
 		try {
 			const res = await userService.cancelProAtPeriodEnd(token);
@@ -314,8 +320,6 @@ export const Dashboard: React.FC = () => {
 							<PlanBillingSection
 								me={me}
 								plan={plan}
-								onUpgrade={upgrade}
-								onCancelPro={cancelPro}
 								topUp={{
 									amount: topUpAmount,
 									onAmountChange: setTopUpAmount,
@@ -331,6 +335,25 @@ export const Dashboard: React.FC = () => {
 									},
 								}}
 							/>
+						</div>
+					)}
+
+					{mainTab === "subscription" && (
+						<div
+							role="tabpanel"
+							className="space-y-5 h-[calc(100vh-310px)]"
+							aria-labelledby="dashboard-tab-subscription">
+							{token && (
+								<SubscriptionSection
+									me={me}
+									plan={plan}
+									token={token}
+									onTopUp={() => setMainTab("billing")}
+									onUpgradeCryptDocker={upgrade}
+									onDowngradeCryptDocker={cancelPro}
+									onRefreshMe={() => void refreshMeSilently()}
+								/>
+							)}
 						</div>
 					)}
 
