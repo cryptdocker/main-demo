@@ -705,18 +705,22 @@ export async function mockBackendRequest(req: MockRequest): Promise<MockReply> {
 			});
 		}
 		const topic = keywords.join(", ");
+		const demoHeadlineCount = 4;
 		return json(true, 200, {
 			success: true,
 			summary: `Demo digest for **${topic}**: narratives are mixed; this text stands in for OpenAI + SERP on the production site.`,
 			sentiment: "bullish",
 			takeaway: "Mock data only — use the live CryptDocker build for real sentiment.",
-			items: keywords.slice(0, 3).map((kw, i) => ({
-				title: `${kw}: weekly flow and positioning (demo headline ${i + 1})`,
-				link: "https://cryptdocker.com",
-				snippet: `Illustrative snippet for keyword “${kw}”.`,
-				date: new Date(Date.now() - i * 43200000).toISOString().slice(0, 10),
-				source: "CryptDocker demo",
-			})),
+			items: Array.from({ length: demoHeadlineCount }, (_, i) => {
+				const kw = keywords[i % keywords.length] ?? "crypto";
+				return {
+					title: `${kw}: weekly flow and positioning (demo headline ${i + 1})`,
+					link: "https://cryptdocker.com",
+					snippet: `Illustrative snippet for keyword “${kw}”.`,
+					date: new Date(Date.now() - i * 43200000).toISOString().slice(0, 10),
+					source: "CryptDocker demo",
+				};
+			}),
 		});
 	}
 

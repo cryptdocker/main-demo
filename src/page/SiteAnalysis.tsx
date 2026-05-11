@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
 	IoGlobeOutline,
@@ -32,6 +32,21 @@ function extractHost(input: string): string | null {
 	} catch {
 		return null;
 	}
+}
+
+/** Renders `**like this**` from mock copy as bold; production API avoids markdown. */
+function renderTextWithInlineBold(text: string): ReactNode[] {
+	const parts = text.split(/(\*\*[^*]+\*\*)/g);
+	return parts.map((part, i) => {
+		if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+			return (
+				<strong key={i} className="font-semibold text-slate-50">
+					{part.slice(2, -2)}
+				</strong>
+			);
+		}
+		return part;
+	});
 }
 
 function sentimentStyle(sentiment: string | undefined) {
@@ -109,7 +124,7 @@ export const SiteAnalysis: React.FC = () => {
 			/>
 
 			<section className="pb-24">
-				<div className="max-w-3xl mx-auto px-6">
+				<div className="max-w-3xl mx-auto px-6 w-full flex flex-col gap-4">
 					<motion.form
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
@@ -148,6 +163,20 @@ export const SiteAnalysis: React.FC = () => {
 							<span className="font-mono">https://uniswap.org</span>
 						</p>
 					</motion.form>
+
+					<p className="border-y border-y-white py-4 text-sm italic text-white leading-relaxed">
+						<strong className="font-semibold text-white">Demo notice:</strong>{" "}
+						This analysis result uses mock headlines and sentiment for UI
+						preview only. It does not reflect live news or real trading signals.
+						<span className="text-teal-400 font-bold">&nbsp;Use the live tool at &nbsp;</span>
+						<a
+							href="https://cryptdocker.com/tools/site-analysis"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="underline text-teal-400 transition font-bold">
+							cryptdocker.com
+						</a>
+					</p>
 
 					{error && (
 						<motion.div
@@ -193,12 +222,12 @@ export const SiteAnalysis: React.FC = () => {
 								</div>
 								{data.summary && (
 									<p className="mt-3 text-slate-200 leading-relaxed">
-										{data.summary}
+										{renderTextWithInlineBold(data.summary)}
 									</p>
 								)}
 								{data.takeaway && (
 									<p className="mt-3 text-sm text-slate-400 italic border-l-2 border-teal-500/40 pl-3">
-										Trader takeaway: {data.takeaway}
+										Trader takeaway: {renderTextWithInlineBold(data.takeaway)}
 									</p>
 								)}
 							</div>

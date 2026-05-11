@@ -1,4 +1,4 @@
-import { useState, useEffect, type KeyboardEvent } from "react";
+import { useState, useEffect, type KeyboardEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
 	IoNewspaperOutline,
@@ -34,6 +34,7 @@ const SUGGESTIONS = [
 	"Airdrops",
 ];
 const MAX_KEYWORDS = 8;
+const MAX_HEADLINES_SHOWN = 25;
 const STORAGE_KEY_CUSTOM_KEYWORDS = "cryptdocker_news_analysis_custom_keywords";
 const MAX_SAVED_CUSTOM = 30;
 const MAX_KEYWORD_LEN = 80;
@@ -56,6 +57,21 @@ function readSavedCustomKeywords(): string[] {
 	} catch {
 		return [];
 	}
+}
+
+/** Renders `**like this**` from mock copy as bold; production API avoids markdown. */
+function renderTextWithInlineBold(text: string): ReactNode[] {
+	const parts = text.split(/(\*\*[^*]+\*\*)/g);
+	return parts.map((part, i) => {
+		if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+			return (
+				<strong key={i} className="font-semibold text-slate-50">
+					{part.slice(2, -2)}
+				</strong>
+			);
+		}
+		return part;
+	});
 }
 
 function sentimentStyle(sentiment: string | undefined) {
@@ -163,10 +179,15 @@ export const NewsAnalysis: React.FC = () => {
 		}
 		if (loading) return;
 
-		const finalKeywords =
-			draft.trim()
-				? [...keywords, ...draft.split(",").map((s) => s.trim()).filter(Boolean)]
-				: [...keywords];
+		const finalKeywords = draft.trim()
+			? [
+					...keywords,
+					...draft
+						.split(",")
+						.map((s) => s.trim())
+						.filter(Boolean),
+				]
+			: [...keywords];
 
 		setKeywords(finalKeywords);
 		setDraft("");
@@ -202,15 +223,14 @@ export const NewsAnalysis: React.FC = () => {
 			/>
 
 			<section className="pb-24">
-				<div className="max-w-3xl mx-auto px-6">
+				<div className="max-w-3xl mx-auto px-6 w-full flex flex-col gap-4">
 					<motion.form
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.5 }}
 						onSubmit={onSubmit}
 						className="glass rounded-2xl p-5 sm:p-6"
-						aria-busy={loading}
-					>
+						aria-busy={loading}>
 						<label className="flex items-center gap-2 text-xs uppercase tracking-wider font-semibold text-slate-400 mb-3">
 							<IoPricetagOutline className="w-4 h-4 text-teal-400" />
 							Interested keywords
@@ -220,15 +240,13 @@ export const NewsAnalysis: React.FC = () => {
 							{keywords.map((k) => (
 								<span
 									key={k}
-									className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-teal-500/40 bg-teal-500/15 text-teal-300 text-xs font-medium"
-								>
+									className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-teal-500/40 bg-teal-500/15 text-teal-300 text-xs font-medium">
 									{k}
 									<button
 										type="button"
 										onClick={() => removeKeyword(k)}
 										className="text-teal-300/80 hover:text-teal-200 cursor-pointer"
-										aria-label={`Remove ${k}`}
-									>
+										aria-label={`Remove ${k}`}>
 										<IoClose className="w-3.5 h-3.5" />
 									</button>
 								</span>
@@ -266,8 +284,7 @@ export const NewsAnalysis: React.FC = () => {
 											already
 												? "border-white/6 text-slate-600 cursor-not-allowed"
 												: "border-white/10 text-slate-400 hover:border-teal-500/40 hover:text-teal-300 cursor-pointer"
-										}`}
-									>
+										}`}>
 										{s}
 									</button>
 								);
@@ -280,8 +297,9 @@ export const NewsAnalysis: React.FC = () => {
 								Your saved keywords
 							</p>
 							<p className="text-xs text-slate-500 mb-3">
-								Save phrases you reuse often. Separate multiple with commas. Click a
-								saved tag to add it to this search, or remove it from your library.
+								Save phrases you reuse often. Separate multiple with commas.
+								Click a saved tag to add it to this search, or remove it from
+								your library.
 							</p>
 							<div className="flex flex-col sm:flex-row gap-2">
 								<input
@@ -305,8 +323,7 @@ export const NewsAnalysis: React.FC = () => {
 									size="sm"
 									className="shrink-0 sm:self-stretch"
 									disabled={!customSaveDraft.trim()}
-									onClick={saveCustomKeywordsToLibrary}
-								>
+									onClick={saveCustomKeywordsToLibrary}>
 									Save to library
 								</Button>
 							</div>
@@ -319,27 +336,28 @@ export const NewsAnalysis: React.FC = () => {
 										return (
 											<span
 												key={k}
-												className="inline-flex items-center gap-0.5 rounded-full border border-violet-500/35 bg-violet-500/12 text-violet-200 text-xs font-medium overflow-hidden"
-											>
+												className="inline-flex items-center gap-0.5 rounded-full border border-violet-500/35 bg-violet-500/12 text-violet-200 text-xs font-medium overflow-hidden">
 												<button
 													type="button"
-													title={inSearch ? "Already in search" : "Add to this search"}
+													title={
+														inSearch
+															? "Already in search"
+															: "Add to this search"
+													}
 													disabled={inSearch}
 													onClick={() => addKeyword(k)}
 													className={`pl-2.5 pr-1 py-1.5 max-w-[200px] truncate cursor-pointer transition ${
 														inSearch
 															? "text-slate-500 cursor-not-allowed"
 															: "hover:bg-white/8 hover:text-white"
-													}`}
-												>
+													}`}>
 													{k}
 												</button>
 												<button
 													type="button"
 													onClick={() => removeSavedCustom(k)}
 													className="px-1.5 py-1.5 text-violet-300/80 hover:text-red-300 hover:bg-red-500/15 cursor-pointer border-l border-white/10"
-													aria-label={`Remove ${k} from library`}
-												>
+													aria-label={`Remove ${k} from library`}>
 													<IoTrashOutline className="w-3.5 h-3.5" />
 												</button>
 											</span>
@@ -352,8 +370,8 @@ export const NewsAnalysis: React.FC = () => {
 								</p>
 							)}
 							<p className="mt-2 text-[11px] text-slate-600">
-								Stored in this browser only (localStorage). Up to {MAX_SAVED_CUSTOM}{" "}
-								saved, {MAX_KEYWORD_LEN} characters each.
+								Stored in this browser only (localStorage). Up to{" "}
+								{MAX_SAVED_CUSTOM} saved, {MAX_KEYWORD_LEN} characters each.
 							</p>
 						</div>
 
@@ -362,9 +380,11 @@ export const NewsAnalysis: React.FC = () => {
 								type="submit"
 								size="lg"
 								disabled={loading || (keywords.length === 0 && !draft.trim())}
-								aria-busy={loading}
-							>
-								<IoSearchOutline className="w-5 h-5 mr-2 shrink-0" aria-hidden />
+								aria-busy={loading}>
+								<IoSearchOutline
+									className="w-5 h-5 mr-2 shrink-0"
+									aria-hidden
+								/>
 								{loading ? "Analyzing…" : "Analyze news"}
 							</Button>
 						</div>
@@ -373,16 +393,32 @@ export const NewsAnalysis: React.FC = () => {
 						</p>
 					</motion.form>
 
+					<p className="border-y border-y-white py-4 text-sm italic text-white leading-relaxed">
+						<strong className="font-semibold text-white">Demo notice:</strong>{" "}
+						This analysis result uses mock headlines and sentiment for UI
+						preview only. It does not reflect live news or real trading signals.
+						<span className="text-teal-400 font-bold">&nbsp;Use the live tool at &nbsp;</span>
+						<a
+							href="https://cryptdocker.com/tools/news-analysis"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="underline text-teal-400 transition font-bold">
+							cryptdocker.com
+						</a>
+					</p>
 					{error && (
 						<motion.div
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
-							className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 flex gap-3"
-						>
+							className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 flex gap-3">
 							<IoAlertCircleOutline className="w-5 h-5 text-red-300 shrink-0 mt-0.5" />
 							<div className="min-w-0">
-								<p className="text-sm font-medium text-red-200">Analysis failed</p>
-								<p className="text-sm text-red-300/80 mt-1 wrap-break-word">{error}</p>
+								<p className="text-sm font-medium text-red-200">
+									Analysis failed
+								</p>
+								<p className="text-sm text-red-300/80 mt-1 wrap-break-word">
+									{error}
+								</p>
 							</div>
 						</motion.div>
 					)}
@@ -400,29 +436,27 @@ export const NewsAnalysis: React.FC = () => {
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.45 }}
-							className="mt-6 space-y-4"
-						>
+							className="space-y-4">
 							<div className="rounded-2xl border border-white/8 bg-white/4 p-5">
-								<div className="flex flex-wrap items-start justify-between gap-3">
-									<p className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2">
-										<IoNewspaperOutline className="w-4 h-4 text-teal-400" />
-										Market read
+								<div className="flex flex-wrap items-center justify-between gap-3">
+									<p className="text-xs uppercase tracking-wider text-slate-400 flex items-center gap-2 min-w-0">
+										<IoNewspaperOutline className="w-4 h-4 text-teal-400 shrink-0" />
+										<span className="truncate">Market read</span>
 									</p>
 									<span
-										className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${tone.wrap}`}
-									>
+										className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold shrink-0 ${tone.wrap}`}>
 										{tone.icon}
 										{tone.label}
 									</span>
 								</div>
 								{data.summary && (
 									<p className="mt-3 text-slate-200 leading-relaxed">
-										{data.summary}
+										{renderTextWithInlineBold(data.summary)}
 									</p>
 								)}
 								{data.takeaway && (
 									<p className="mt-3 text-sm text-slate-400 italic border-l-2 border-teal-500/40 pl-3">
-										Trader takeaway: {data.takeaway}
+										Trader takeaway: {renderTextWithInlineBold(data.takeaway)}
 									</p>
 								)}
 							</div>
@@ -433,11 +467,10 @@ export const NewsAnalysis: React.FC = () => {
 										Headlines ({data.items.length})
 									</p>
 									<ul className="space-y-3">
-										{data.items.slice(0, 15).map((item, i) => (
+										{data.items.slice(0, MAX_HEADLINES_SHOWN).map((item, i) => (
 											<li
 												key={i}
-												className="flex gap-3 rounded-xl p-2 -mx-2 hover:bg-white/4 transition"
-											>
+												className="flex gap-3 rounded-xl p-2 -mx-2 hover:bg-white/4 transition">
 												{item.thumbnail ? (
 													<img
 														src={item.thumbnail}
@@ -455,8 +488,7 @@ export const NewsAnalysis: React.FC = () => {
 														href={item.link}
 														target="_blank"
 														rel="noopener noreferrer"
-														className="text-sm font-medium text-slate-100 hover:text-teal-300 transition-colors line-clamp-2 inline-flex items-start gap-1"
-													>
+														className="text-sm font-medium text-slate-100 hover:text-teal-300 transition-colors line-clamp-2 inline-flex items-start gap-1">
 														{item.title}
 														<IoOpenOutline className="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-60" />
 													</a>

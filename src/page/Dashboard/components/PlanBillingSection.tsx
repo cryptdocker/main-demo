@@ -1,16 +1,70 @@
+import { useEffect, useState } from "react";
 import { Button } from "../../../component/Button";
 import type { MeResponse } from "../../../services/user.service";
 import {
 	IoCashOutline,
 	IoCheckmarkCircleOutline,
 	IoCopyOutline,
-	IoHourglassOutline,
-	IoPricetagOutline,
 } from "react-icons/io5";
-import { cx, fmt } from "./shared";
-import { Badge, Section, Select, Stat } from "./ui";
+import { useAuth } from "../../../auth/useAuth";
+import { apiFetch } from "../../../services/api";
+import {
+	apiGetSubscription,
+	type SubscriptionInfo,
+} from "../../../tradeGPT/lib/api";
+import { cx } from "./shared";
+import { Section, Select } from "./ui";
 import type { CreatePaymentResult } from "../../../services/payment.service";
 import { usePaymentQr } from "./usePaymentQr";
+
+type PlanProductPlan = "Free" | "Trial" | "Pro" | "—";
+
+function planProductVisualVariant(plan: PlanProductPlan): "good" | "neutral" {
+	return plan === "Pro" || plan === "Trial" ? "good" : "neutral";
+}
+
+/** Product + plan in one pill; vertical divider is edge-to-edge (no horizontal padding). */
+function PlanProductBadge({
+	product,
+	plan,
+}: {
+	product: string;
+	plan: PlanProductPlan;
+}) {
+	const v = planProductVisualVariant(plan);
+	return (
+		<span
+			className={cx(
+				"inline-flex min-h-0 items-stretch rounded-full border text-xs font-semibold",
+				v === "good" &&
+					"border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
+				v === "neutral" && "border-white/10 bg-white/5 text-slate-300",
+			)}>
+			<span className="inline-flex items-center px-2.5 py-1">{product}</span>
+			<span
+				className={cx(
+					"w-px shrink-0 self-stretch",
+					v === "good" && "bg-emerald-500/35",
+					v === "neutral" && "bg-white/20",
+				)}
+				aria-hidden
+			/>
+			<span className="inline-flex items-center px-2.5 py-1">{plan}</span>
+		</span>
+	);
+}
+
+function PlanProductBadgeSkeleton() {
+	return (
+		<span
+			className="inline-flex h-7 min-w-40 max-w-48 shrink-0 items-stretch overflow-hidden rounded-full border border-white/10 bg-white/5"
+			aria-hidden>
+			<span className="min-w-18 flex-1 animate-pulse bg-white/10 motion-reduce:animate-none" />
+			<span className="w-px shrink-0 self-stretch bg-white/10" />
+			<span className="w-11 shrink-0 animate-pulse bg-white/10 motion-reduce:animate-none" />
+		</span>
+	);
+}
 
 export function PlanBillingSection({
 	me,
@@ -39,63 +93,129 @@ export function PlanBillingSection({
 			? "Trial"
 			: "Free";
 
+	type ProjectSubscriptionStatus = {
+		project: "cryptdocker" | "tradegpt" | "mentalshield";
+		paymentMethod: "free" | "pro";
+		billingDate: string | null;
+		trialExpiresAt: string | null;
+		proGraceUntil: string | null;
+		proCancelAtPeriodEnd: boolean;
+		trialActive: boolean;
+		trialDaysLeft: number;
+		nextBillingDate: string | null;
+	};
+
+	const { token } = useAuth();
+	const [projectSubs, setProjectSubs] = useState<ProjectSubscriptionStatus[]>(
+		[],
+	);
+	const [tradeGpt, setTradeGpt] = useState<SubscriptionInfo | null>(null);
+	const [planBadgesLoading, setPlanBadgesLoading] = useState(false);
+
+	useEffect(() => {
+		if (!token) {
+			setProjectSubs([]);
+			setTradeGpt(null);
+			setPlanBadgesLoading(false);
+			return;
+		}
+
+		let cancelled = false;
+		setPlanBadgesLoading(true);
+		void (async () => {
+			const [subsRes, tgRes] = await Promise.allSettled([
+				apiFetch<{ subscriptions: ProjectSubscriptionStatus[] }>(
+					"/user/subscriptions",
+					{
+						headers: { Authorization: `Bearer ${token}` },
+					},
+				),
+				apiGetSubscription(token),
+			]);
+			if (cancelled) return;
+			if (subsRes.status === "fulfilled") {
+				setProjectSubs(
+					Array.isArray(subsRes.value.subscriptions)
+						? subsRes.value.subscriptions
+						: [],
+				);
+			} else {
+				setProjectSubs([]);
+			}
+			if (tgRes.status === "fulfilled") {
+				setTradeGpt(tgRes.value);
+			} else {
+				setTradeGpt(null);
+			}
+			setPlanBadgesLoading(false);
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [token]);
+
+	type PlanLabel = PlanProductPlan;
+
+	const mentalShieldSub =
+		projectSubs.find((s) => s.project === "mentalshield") ?? null;
+
+	const tradeGptPlan: PlanLabel = !tradeGpt
+		? "—"
+		: tradeGpt.plan === "pro"
+			? "Pro"
+			: tradeGpt.trialActive
+				? "Trial"
+				: "Free";
+
+	const mentalShieldPlan: PlanLabel = !mentalShieldSub
+		? "—"
+		: mentalShieldSub.paymentMethod === "pro"
+			? "Pro"
+			: mentalShieldSub.trialActive
+				? "Trial"
+				: "Free";
+
 	return (
 		<Section
 			title="Plan & billing"
 			icon={<IoCashOutline className="text-lg" />}>
 			<div className="flex flex-col items-center justify-center w-full h-full gap-4">
-				<div className="flex w-full items-center gap-4 max-w-3xl">
-					<div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3">
-						<div className="flex items-center gap-2 min-w-0">
-							<p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-								<span className="text-slate-500/90">
-									<IoCashOutline className="text-sm" />
-								</span>
-								Balance
-							</p>
-							<p className="text-base font-semibold text-white leading-snug">
-								$ {me?.balance ?? "—"}
-							</p>
-						</div>
+				<div className="flex w-full flex-col items-center gap-4 max-w-5xl">
+					{/* Balance (top + highlighted) */}
+					<div className="flex items-center gap-2 min-w-0 w-full">
+						<p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 uppercase tracking-wide">
+							Balance
+						</p>
+						<p className="text-base font-semibold text-white leading-snug">
+							$ {me?.balance ?? "—"}
+						</p>
 					</div>
 
-					<div className="rounded-2xl border border-white/8 bg-white/3 px-4 py-3 h-12 flex items-center gap-2">
-						<p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-							<span className="text-slate-500/90">
-								<IoPricetagOutline className="text-sm" />
-							</span>
-							Current plan
-						</p>
-						<div className="flex flex-wrap items-center gap-2">
-							<Badge
-								variant={
-									cryptdockerPlan === "Pro"
-										? "good"
-										: cryptdockerPlan === "Trial"
-											? "good"
-											: "neutral"
-								}>
-								{cryptdockerPlan}
-							</Badge>
+					{/* Product + Plan badges (single row) */}
+					<div className="w-full">
+						<div
+							className="flex items-center gap-2 flex-nowrap overflow-x-auto"
+							aria-busy={planBadgesLoading}
+							aria-label={planBadgesLoading ? "Loading product plans" : undefined}>
+							{planBadgesLoading ? (
+								<>
+									<PlanProductBadgeSkeleton />
+									<PlanProductBadgeSkeleton />
+									<PlanProductBadgeSkeleton />
+								</>
+							) : (
+								<>
+									<PlanProductBadge product="CryptDocker" plan={cryptdockerPlan} />
+									<PlanProductBadge product="TradeGPT" plan={tradeGptPlan} />
+									<PlanProductBadge product="MentalShield" plan={mentalShieldPlan} />
+								</>
+							)}
 						</div>
 					</div>
-					{plan.trialActive && (
-						<Stat
-							label="Trial ends"
-							icon={<IoHourglassOutline className="text-sm" />}
-							value={fmt(me?.trialExpiresAt)}
-						/>
-					)}
-					{plan.graceActive && (
-						<Stat
-							label="Grace period"
-							icon={<IoHourglassOutline className="text-sm" />}
-							value={fmt(me?.proGraceUntil)}
-						/>
-					)}
 				</div>
 
-				<div className="rounded-2xl border border-white/10 bg-dark-card/40 p-4 w-full max-w-3xl">
+				<div className="rounded-2xl border border-white/10 bg-dark-card/40 p-4 w-full max-w-5xl">
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 						<label className="space-y-1">
 							<span className="text-xs font-semibold text-slate-500">
