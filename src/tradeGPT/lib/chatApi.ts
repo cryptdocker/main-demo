@@ -210,8 +210,8 @@ export type StreamEvent =
 
 /** Demo-only pause so the chat UI shows ~300–500ms of loading before the mock stream starts. */
 function delayDemoAssistantMs(): Promise<void> {
-  const min = 300;
-  const max = 500;
+  const min = 1000;
+  const max = 1500;
   const ms = min + Math.floor(Math.random() * (max - min + 1));
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
